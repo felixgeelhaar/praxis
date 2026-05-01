@@ -10,6 +10,10 @@ import (
 	"time"
 
 	"github.com/felixgeelhaar/praxis/internal/plugin"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/propagation"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 )
 
 type slowHandler struct {
@@ -149,5 +153,38 @@ func TestSandboxed_PreservesName(t *testing.T) {
 func TestHTTPClient_AbsentReturnsNil(t *testing.T) {
 	if c := plugin.HTTPClient(context.Background()); c != nil {
 		t.Errorf("expected nil client outside sandbox, got %v", c)
+	}
+}
+
+func TestSandboxed_OutboundRequestCarriesTraceparent(t *testing.T) {
+	exporter := tracetest.NewInMemoryExporter()
+	tp := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exporter))
+	otel.SetTracerProvider(tp)
+	otel.SetTextMapPropagator(propagation.TraceContext{})
+	t.Cleanup(func() {
+		otel.SetTracerProvider(otel.GetTracerProvider())
+	})
+
+	var sawHeader string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		sawHeader = r.Header.Get("Traceparent")
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+	u, _ := url.Parse(srv.URL)
+
+	h := plugin.Sandboxed(httpHandler{url: srv.URL}, plugin.ResourceBudget{
+		AllowedHosts: []string{u.Hostname()},
+	})
+
+	tracer := otel.Tracer("test")
+	ctx, span := tracer.Start(context.Background(), "outer")
+	defer span.End()
+
+	if _, err := h.Execute(ctx, nil); err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	if sawHeader == "" {
+		t.Error("server did not see Traceparent header on outbound request")
 	}
 }

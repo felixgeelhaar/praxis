@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/felixgeelhaar/praxis/internal/capability"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
 // ErrEgressBlocked signals that a sandboxed plugin attempted to reach a
@@ -89,11 +90,18 @@ func (s *sandboxedHandler) buildClient() *http.Client {
 	for _, h := range s.budget.AllowedHosts {
 		allowed[h] = struct{}{}
 	}
+	// Wrap inside-out: hostFilter rejects denied destinations BEFORE
+	// the request hits the network; otelhttp wraps that result so the
+	// outbound call gets traceparent propagation, request/response
+	// span attrs, and child-span linkage to the executor's
+	// handler.<cap> span. Order matters — putting otelhttp inside
+	// hostFilter would still create the span for blocked requests,
+	// which misrepresents what was attempted.
 	return &http.Client{
-		Transport: &hostFilterTransport{
+		Transport: otelhttp.NewTransport(&hostFilterTransport{
 			base:    http.DefaultTransport,
 			allowed: allowed,
-		},
+		}),
 	}
 }
 
