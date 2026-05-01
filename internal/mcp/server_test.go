@@ -2,6 +2,7 @@ package mcp_test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"testing"
@@ -91,6 +92,9 @@ type errExec struct{}
 func (errExec) ListCapabilities(_ context.Context) ([]domain.Capability, error) {
 	return nil, errors.New("list failed")
 }
+func (errExec) ListCapabilitiesForCaller(_ context.Context, _ domain.CallerRef) ([]domain.Capability, error) {
+	return nil, errors.New("list failed")
+}
 func (errExec) Execute(_ context.Context, _ domain.Action) (domain.Result, error) {
 	return domain.Result{Status: domain.StatusFailed, Error: &domain.ActionError{Code: "x", Message: "boom"}}, errors.New("boom")
 }
@@ -122,5 +126,37 @@ func TestRegister_RegistersOneToolPerCapability(t *testing.T) {
 	}
 	if tool == nil {
 		t.Fatal("nil tool")
+	}
+}
+
+// captureExec wraps a real executor but records the CallerRef the MCP
+// surface passed into ListCapabilitiesForCaller. Lets the test confirm
+// the OrgID/TeamID from the tool input plumbed through.
+type captureExec struct {
+	pmcp.Executor
+	lastCaller domain.CallerRef
+}
+
+func (c *captureExec) ListCapabilitiesForCaller(ctx context.Context, caller domain.CallerRef) ([]domain.Capability, error) {
+	c.lastCaller = caller
+	return c.Executor.ListCapabilitiesForCaller(ctx, caller)
+}
+
+func TestListCapabilities_PlumbsCallerFromToolInput(t *testing.T) {
+	inner, _ := newExec(t)
+	capExec := &captureExec{Executor: inner}
+
+	srv := pmcp.Register(pmcp.Info{Name: "praxis", Version: "v"}, capExec, func() string { return "id" })
+	tool, ok := srv.GetTool("list_capabilities")
+	if !ok {
+		t.Fatal("list_capabilities missing")
+	}
+	// Synthesize the tool call with org_id/team_id input.
+	in, _ := json.Marshal(map[string]any{"org_id": "org-x", "team_id": "eng"})
+	if _, err := tool.Execute(context.Background(), in); err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	if capExec.lastCaller.OrgID != "org-x" || capExec.lastCaller.TeamID != "eng" {
+		t.Errorf("caller=%+v want org-x/eng", capExec.lastCaller)
 	}
 }

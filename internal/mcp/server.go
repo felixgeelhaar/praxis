@@ -36,6 +36,7 @@ import (
 // executor wired up.
 type Executor interface {
 	ListCapabilities(ctx context.Context) ([]domain.Capability, error)
+	ListCapabilitiesForCaller(ctx context.Context, caller domain.CallerRef) ([]domain.Capability, error)
 	Execute(ctx context.Context, action domain.Action) (domain.Result, error)
 	DryRun(ctx context.Context, action domain.Action) (domain.Simulation, error)
 }
@@ -54,7 +55,18 @@ type ExecuteInput struct {
 	Mode           string         `json:"mode,omitempty"`
 	CallerType     string         `json:"caller_type,omitempty"`
 	CallerID       string         `json:"caller_id,omitempty"`
+	OrgID          string         `json:"org_id,omitempty"`  // tenant scope; routes private capabilities (Phase 4)
+	TeamID         string         `json:"team_id,omitempty"` // tenant scope; (Phase 4)
 	Scope          []string       `json:"scope,omitempty"`
+}
+
+// ListCapsInput is the optional body of the universal `list_capabilities`
+// tool. Empty input returns the global view; OrgID/TeamID scope the
+// returned set to the caller's tenant-private capabilities plus the
+// globals (Phase 4 M3.3).
+type ListCapsInput struct {
+	OrgID  string `json:"org_id,omitempty"`
+	TeamID string `json:"team_id,omitempty"`
 }
 
 // ExecuteOutput is the result envelope returned to MCP clients.
@@ -90,9 +102,10 @@ func Register(info Info, exec Executor, idGen func() string) *mcp.Server {
 	})
 
 	srv.Tool("list_capabilities").
-		Description("List every capability this Praxis server knows how to execute. Returns the full descriptor so callers can validate input client-side.").
-		Handler(func(ctx context.Context, _ struct{}) (ListCapsOutput, error) {
-			caps, err := exec.ListCapabilities(ctx)
+		Description("List every capability this Praxis server knows how to execute. Returns the full descriptor so callers can validate input client-side. Optional org_id/team_id scope the result to the caller's tenant-private capabilities plus the globals.").
+		Handler(func(ctx context.Context, in ListCapsInput) (ListCapsOutput, error) {
+			caller := domain.CallerRef{OrgID: in.OrgID, TeamID: in.TeamID}
+			caps, err := exec.ListCapabilitiesForCaller(ctx, caller)
 			if err != nil {
 				return ListCapsOutput{}, err
 			}
@@ -152,6 +165,8 @@ type CapInput struct {
 	Mode           string         `json:"mode,omitempty"`
 	CallerType     string         `json:"caller_type,omitempty"`
 	CallerID       string         `json:"caller_id,omitempty"`
+	OrgID          string         `json:"org_id,omitempty"`
+	TeamID         string         `json:"team_id,omitempty"`
 	Scope          []string       `json:"scope,omitempty"`
 }
 
@@ -221,10 +236,15 @@ func actionFromCapInput(capName string, in CapInput, idGen func() string) domain
 		mode = domain.ModeSync
 	}
 	return domain.Action{
-		ID:             id,
-		Capability:     capName,
-		Payload:        in.Payload,
-		Caller:         domain.CallerRef{Type: firstNonEmpty(in.CallerType, "mcp"), ID: in.CallerID},
+		ID:         id,
+		Capability: capName,
+		Payload:    in.Payload,
+		Caller: domain.CallerRef{
+			Type:   firstNonEmpty(in.CallerType, "mcp"),
+			ID:     in.CallerID,
+			OrgID:  in.OrgID,
+			TeamID: in.TeamID,
+		},
 		Scope:          in.Scope,
 		IdempotencyKey: firstNonEmpty(in.IdempotencyKey, id),
 		Mode:           mode,
@@ -244,7 +264,12 @@ func actionFromInput(in ExecuteInput, idGen func() string) domain.Action {
 	if mode == "" {
 		mode = domain.ModeSync
 	}
-	caller := domain.CallerRef{Type: firstNonEmpty(in.CallerType, "mcp"), ID: in.CallerID}
+	caller := domain.CallerRef{
+		Type:   firstNonEmpty(in.CallerType, "mcp"),
+		ID:     in.CallerID,
+		OrgID:  in.OrgID,
+		TeamID: in.TeamID,
+	}
 	return domain.Action{
 		ID:             id,
 		Capability:     in.Capability,
