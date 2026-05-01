@@ -1,0 +1,53 @@
+name: Bench publish
+
+# Tag-triggered: runs the full bench suite, formats results into
+# docs/benchmarks.md, and opens a PR. Runs on tag pushes only so
+# regular development doesn't churn the doc.
+#
+# Phase 5 perf benchmarks (t-bench-publish-docs).
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.26.x"
+          check-latest: true
+          cache: true
+
+      - name: Run benchmarks
+        run: |
+          mkdir -p bench
+          make bench > bench/release.txt
+
+      - name: Render docs/benchmarks.md
+        run: |
+          go run ./cmd/benchdocs \
+            -input bench/release.txt \
+            -output docs/benchmarks.md \
+            -tag "${GITHUB_REF_NAME}"
+
+      - name: Open PR with updated docs/benchmarks.md
+        uses: peter-evans/create-pull-request@v6
+        with:
+          commit-message: "docs(bench): update benchmarks.md for ${{ github.ref_name }}"
+          title: "docs(bench): publish ${{ github.ref_name }} benchmark results"
+          body: |
+            Automated PR opened by the bench-publish workflow on
+            tag ${{ github.ref_name }}. Benchmarks captured via
+            `make bench` and rendered into docs/benchmarks.md by
+            cmd/benchdocs.
+          branch: bench/${{ github.ref_name }}
+          add-paths: docs/benchmarks.md
