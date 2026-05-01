@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"github.com/felixgeelhaar/bolt"
+	"github.com/felixgeelhaar/praxis/internal/audit"
 	"github.com/felixgeelhaar/praxis/internal/capability"
 	"github.com/felixgeelhaar/praxis/internal/domain"
 	"github.com/felixgeelhaar/praxis/internal/executor"
@@ -207,6 +208,43 @@ func newMux(deps kernelDeps, m *metrics) *http.ServeMux {
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"events": results})
+	})))
+
+	mux.Handle("GET /v1/audit/export", traced(authed(func(w http.ResponseWriter, r *http.Request) {
+		format, err := audit.ParseFormat(r.URL.Query().Get("format"))
+		if err != nil {
+			writeJSON(w, http.StatusBadRequest, errResponse(err.Error()))
+			return
+		}
+		q := ports.AuditQuery{
+			Capability: r.URL.Query().Get("capability"),
+			CallerType: r.URL.Query().Get("caller_type"),
+		}
+		if from := r.URL.Query().Get("from"); from != "" {
+			if v, err := strconv.ParseInt(from, 10, 64); err == nil {
+				q.From = v
+			}
+		}
+		if to := r.URL.Query().Get("to"); to != "" {
+			if v, err := strconv.ParseInt(to, 10, 64); err == nil {
+				q.To = v
+			}
+		}
+		var redactor *audit.Redactor
+		if r.URL.Query().Get("redact") == "true" {
+			redactor = audit.NewDefaultRedactor()
+		}
+		exporter := audit.NewExporter(deps.repos.Audit, redactor)
+		switch format {
+		case audit.FormatJSON:
+			w.Header().Set("Content-Type", "application/json")
+		case audit.FormatCSV:
+			w.Header().Set("Content-Type", "text/csv")
+			w.Header().Set("Content-Disposition", `attachment; filename="praxis-audit.csv"`)
+		}
+		if err := exporter.Export(r.Context(), w, format, q); err != nil {
+			deps.logger.Error().Err(err).Msg("audit export")
+		}
 	})))
 
 	mux.Handle("GET /v1/audit/{action_id}", traced(authed(func(w http.ResponseWriter, r *http.Request) {
