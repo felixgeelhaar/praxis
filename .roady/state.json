@@ -432,14 +432,20 @@
       "elapsed_minutes": 0
     },
     "t-audit-export-json-csv": {
-      "status": "pending",
+      "status": "done",
       "path": "",
-      "elapsed_minutes": 0
+      "elapsed_minutes": 90,
+      "owner": "ai-agent",
+      "started_at": "2026-05-01T13:06:41.574263+00:00",
+      "completed_at": "2026-05-01T13:06:41.574263+00:00"
     },
     "t-audit-pii-redaction": {
-      "status": "pending",
+      "status": "done",
       "path": "",
-      "elapsed_minutes": 0
+      "elapsed_minutes": 90,
+      "owner": "ai-agent",
+      "started_at": "2026-05-01T13:06:41.574263+00:00",
+      "completed_at": "2026-05-01T13:06:41.574263+00:00"
     },
     "t-org-dashboards": {
       "status": "pending",
