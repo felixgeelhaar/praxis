@@ -197,6 +197,29 @@ func newMux(deps kernelDeps, m *metrics) *http.ServeMux {
 		writeJSON(w, http.StatusOK, sim)
 	})))
 
+	mux.Handle("GET /v1/dashboards/usage", traced(authed(func(w http.ResponseWriter, r *http.Request) {
+		q := ports.AuditQuery{
+			Capability: r.URL.Query().Get("capability"),
+			CallerType: r.URL.Query().Get("caller_type"),
+		}
+		if from := r.URL.Query().Get("from"); from != "" {
+			if v, err := strconv.ParseInt(from, 10, 64); err == nil {
+				q.From = v
+			}
+		}
+		if to := r.URL.Query().Get("to"); to != "" {
+			if v, err := strconv.ParseInt(to, 10, 64); err == nil {
+				q.To = v
+			}
+		}
+		dash, err := audit.BuildDashboard(r.Context(), deps.repos.Audit, q)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, errResponse(err.Error()))
+			return
+		}
+		writeJSON(w, http.StatusOK, dash)
+	})))
+
 	mux.Handle("GET /v1/audit", traced(authed(func(w http.ResponseWriter, r *http.Request) {
 		q := ports.AuditQuery{
 			Capability: r.URL.Query().Get("capability"),
