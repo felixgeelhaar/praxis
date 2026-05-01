@@ -391,14 +391,20 @@
       "completed_at": "2026-05-01T10:45:09.126367+00:00"
     },
     "t-mcp-tool-discovery": {
-      "status": "pending",
+      "status": "done",
       "path": "",
-      "elapsed_minutes": 0
+      "elapsed_minutes": 60,
+      "owner": "ai-agent",
+      "started_at": "2026-05-01T13:01:38.077882+00:00",
+      "completed_at": "2026-05-01T13:01:38.077882+00:00"
     },
     "t-mcp-tool-execute-dryrun": {
-      "status": "pending",
+      "status": "done",
       "path": "",
-      "elapsed_minutes": 0
+      "elapsed_minutes": 60,
+      "owner": "ai-agent",
+      "started_at": "2026-05-01T13:01:38.077882+00:00",
+      "completed_at": "2026-05-01T13:01:38.077882+00:00"
     },
     "t-tenant-scope-hierarchy": {
       "status": "pending",
