@@ -6,6 +6,7 @@ import (
 	"io"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/felixgeelhaar/praxis/internal/plugin"
 	"github.com/felixgeelhaar/praxis/internal/plugin/ipc"
@@ -191,4 +192,37 @@ type pipe struct {
 func newPipe() *pipe {
 	r, w := io.Pipe()
 	return &pipe{r: r, w: w}
+}
+
+func TestBudgetEnv_PassthroughWhenZero(t *testing.T) {
+	in := []string{"PATH=/usr/bin", "LANG=C"}
+	out := plugin.BudgetEnvForTest(in, plugin.ResourceBudget{})
+	if len(out) != 2 || out[0] != "PATH=/usr/bin" || out[1] != "LANG=C" {
+		t.Errorf("out=%v", out)
+	}
+}
+
+func TestBudgetEnv_AppendsCPUAndMem(t *testing.T) {
+	in := []string{"PATH=/usr/bin"}
+	out := plugin.BudgetEnvForTest(in, plugin.ResourceBudget{
+		CPUTimeout:     30 * time.Second,
+		MaxMemoryBytes: 100 << 20,
+	})
+	wantCPU := "PRAXIS_PLUGIN_BUDGET_CPU_SEC=30"
+	wantMem := "PRAXIS_PLUGIN_BUDGET_MEM_BYTES=104857600"
+	var sawCPU, sawMem bool
+	for _, e := range out {
+		if e == wantCPU {
+			sawCPU = true
+		}
+		if e == wantMem {
+			sawMem = true
+		}
+	}
+	if !sawCPU {
+		t.Errorf("missing %s in %v", wantCPU, out)
+	}
+	if !sawMem {
+		t.Errorf("missing %s in %v", wantMem, out)
+	}
 }

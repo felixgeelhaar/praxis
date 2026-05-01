@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
 	"strconv"
 	"sync"
@@ -15,15 +16,50 @@ import (
 	"github.com/felixgeelhaar/praxis/internal/plugin/ipc"
 )
 
+// Env-var names mirroring the contract on the host (cmd/praxis-pluginhost).
+// Defining the constants here as well lets the parent set them without
+// importing the cmd package.
+const (
+	envBudgetCPUSeconds = "PRAXIS_PLUGIN_BUDGET_CPU_SEC"
+	envBudgetMemBytes   = "PRAXIS_PLUGIN_BUDGET_MEM_BYTES"
+)
+
+// BudgetEnvForTest exposes budgetEnv to the package's external test
+// suite. Production callers should not depend on this.
+func BudgetEnvForTest(env []string, budget ResourceBudget) []string {
+	return budgetEnv(env, budget)
+}
+
+// budgetEnv copies env and appends the budget vars when budget has any
+// non-zero field. Empty budgets pass env through unchanged so the
+// parent's resolved environment (PATH, locale, etc.) reaches the
+// child unmodified.
+func budgetEnv(env []string, budget ResourceBudget) []string {
+	if budget.CPUTimeout == 0 && budget.MaxMemoryBytes == 0 {
+		return env
+	}
+	out := append([]string(nil), env...)
+	if budget.CPUTimeout > 0 {
+		out = append(out, fmt.Sprintf("%s=%d", envBudgetCPUSeconds, int64(budget.CPUTimeout.Seconds())))
+	}
+	if budget.MaxMemoryBytes > 0 {
+		out = append(out, fmt.Sprintf("%s=%d", envBudgetMemBytes, budget.MaxMemoryBytes))
+	}
+	return out
+}
+
 // ProcessOpener is an Opener implementation that spawns a
 // praxis-pluginhost child process per plugin and proxies the Plugin
 // interface over IPC. Phase 4 out-of-process loader.
 //
 // The Binary field is the absolute path to the praxis-pluginhost
 // binary; tests inject their own command for round-tripping the
-// protocol against an in-process echo server.
+// protocol against an in-process echo server. Budget, when non-zero,
+// is forwarded to the child via PRAXIS_PLUGIN_BUDGET_* env vars and
+// the child applies setrlimit at startup.
 type ProcessOpener struct {
 	Binary string
+	Budget ResourceBudget
 
 	// SpawnFn is the test seam: production uses exec.Command, tests
 	// supply a custom transport pair without touching the OS.
@@ -61,6 +97,7 @@ func (o *ProcessOpener) spawn(ctx context.Context, artefactPath string) (io.Writ
 		return nil, nil, nil, errors.New("ProcessOpener: Binary is required")
 	}
 	cmd := exec.CommandContext(ctx, o.Binary, artefactPath)
+	cmd.Env = budgetEnv(os.Environ(), o.Budget)
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
 		return nil, nil, nil, err

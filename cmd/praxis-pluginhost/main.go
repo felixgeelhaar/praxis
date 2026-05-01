@@ -31,6 +31,10 @@ func main() {
 		fmt.Fprintln(os.Stderr, "usage: praxis-pluginhost <plugin.so>")
 		os.Exit(2)
 	}
+	if err := applyBudgetFromEnv(); err != nil {
+		fmt.Fprintln(os.Stderr, "pluginhost: apply budget:", err)
+		os.Exit(1)
+	}
 	if err := run(os.Args[1], os.Stdin, os.Stdout); err != nil {
 		fmt.Fprintln(os.Stderr, "pluginhost:", err)
 		os.Exit(1)
