@@ -167,6 +167,27 @@ func bootstrap(ctx context.Context) (*runtime, func(), error) {
 	}, cleanup, nil
 }
 
+// runSighupReload listens for SIGHUP and re-runs the plugin pipeline
+// when it arrives. Returns when ctx is cancelled. Phase 4: pairs with
+// the fsnotify watcher for deployments where file events aren't
+// available (containers, NFS, etc.).
+func runSighupReload(ctx context.Context, rt *runtime) {
+	ch := make(chan os.Signal, 1)
+	signal.Notify(ch, syscall.SIGHUP)
+	defer signal.Stop(ch)
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ch:
+			rt.logger.Info().Msg("SIGHUP received; rescanning plugins")
+			if err := loadPlugins(ctx, rt.logger, rt.cfg, rt.reg, rt.metrics); err != nil {
+				rt.logger.Error().Err(err).Msg("SIGHUP plugin rescan failed")
+			}
+		}
+	}
+}
+
 // pluginRegistryLoader bridges the in-process *capability.Registry into
 // plugin.Loader. Phase 4 M3.1.
 type pluginRegistryLoader struct{ reg *capability.Registry }
@@ -280,6 +301,16 @@ func runServe() int {
 		} else {
 			go w.Run(ctx)
 		}
+	}
+
+	// SIGHUP forces a full plugin re-scan. Operators on file-watch-less
+	// deployments (containers without inotify, NFS mounts, etc.) rely on
+	// this to pick up rotated plugins. Idempotent: the pipeline runs
+	// through verify+Load which is safe to repeat against unchanged
+	// plugins (Go's plugin.Open caches the *Plugin handle so dlopen is
+	// a no-op the second time).
+	if rt.cfg.PluginDir != "" {
+		go runSighupReload(ctx, rt)
 	}
 
 	if len(rt.cfg.AuditRetention) > 0 {
