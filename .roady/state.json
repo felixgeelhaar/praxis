@@ -422,14 +422,20 @@
       "elapsed_minutes": 0
     },
     "t-capability-compensate": {
-      "status": "pending",
+      "status": "done",
       "path": "",
-      "elapsed_minutes": 0
+      "elapsed_minutes": 90,
+      "owner": "ai-agent",
+      "started_at": "2026-05-01T13:09:10.065000+00:00",
+      "completed_at": "2026-05-01T13:09:10.065000+00:00"
     },
     "t-cli-revert-command": {
-      "status": "pending",
+      "status": "done",
       "path": "",
-      "elapsed_minutes": 0
+      "elapsed_minutes": 90,
+      "owner": "ai-agent",
+      "started_at": "2026-05-01T13:09:10.065000+00:00",
+      "completed_at": "2026-05-01T13:09:10.065000+00:00"
     },
     "t-audit-export-json-csv": {
       "status": "done",
