@@ -1,0 +1,32 @@
+# Build artifacts
+bin/
+dist/
+*.exe
+*.test
+*.out
+
+# Coverage
+coverage.out
+coverage.html
+*.cover
+
+# Local config / secrets
+.env
+.env.local
+*.local
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+*.swp
+*~
+
+# Local SQLite DBs (tests)
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+
+# tmp
+tmp/

@@ -1,0 +1,339 @@
+{
+  "id": "plan-Praxis-1777309188",
+  "spec_id": "Praxis",
+  "tasks": [
+    {
+      "id": "t-init-go-module",
+      "title": "Initialize Go module and pin foundation libraries",
+      "description": "go mod init github.com/felixgeelhaar/praxis (Go 1.25+). Add bolt v1.3.0, fortify v1.2.1, mcp-go v1.9.0, statekit v1.3.2, axi-go v1.2.0 at the same versions Mnemos uses. Acceptance: go mod tidy clean; go build ./... works.",
+      "priority": "high",
+      "estimate": "1h",
+      "depends_on": [],
+      "feature_id": "f1-foundation-scaffolding"
+    },
+    {
+      "id": "t-makefile",
+      "title": "Add Makefile mirroring Mnemos targets",
+      "description": "Targets fmt, lint, test, build, check, sqlc, install, release-check. Mirror Mnemos's structure with version/commit/build-date ldflags. Acceptance: make check runs go fmt, go vet, golangci-lint run, go test ./..., and go build.",
+      "priority": "high",
+      "estimate": "30m",
+      "depends_on": [
+        "t-init-go-module"
+      ],
+      "feature_id": "f1-foundation-scaffolding"
+    },
+    {
+      "id": "t-sqlc-config",
+      "title": "Configure sqlc.yaml for SQLite and Postgres engines",
+      "description": "Two engines per TDD section 7.2 - sqlite (database/sql) and postgresql (pgx/v5). Generated code into internal/store/sqlite/sqlcgen and internal/store/postgres/sqlcgen. Acceptance: make sqlc exits 0 even with empty queries files.",
+      "priority": "high",
+      "estimate": "30m",
+      "depends_on": [
+        "t-init-go-module"
+      ],
+      "feature_id": "f1-foundation-scaffolding"
+    },
+    {
+      "id": "t-gitignore-editorconfig",
+      "title": "Add .gitignore, .editorconfig, .golangci.yml",
+      "description": "Mirror Mnemos's settings, swapping mnemos paths for praxis. Acceptance: golangci-lint run exits 0 on a fresh repo.",
+      "priority": "high",
+      "estimate": "30m",
+      "depends_on": [
+        "t-init-go-module"
+      ],
+      "feature_id": "f1-foundation-scaffolding"
+    },
+    {
+      "id": "t-license",
+      "title": "Add MIT LICENSE",
+      "description": "MIT license file matching Mnemos's. README already references it. Acceptance: file exists; copyright names Felix Geelhaar.",
+      "priority": "medium",
+      "estimate": "10m",
+      "depends_on": [],
+      "feature_id": "f1-foundation-scaffolding"
+    },
+    {
+      "id": "t-domain-types",
+      "title": "Define DDD domain types",
+      "description": "internal/domain/ with Capability, Action, ActionStatus, Result, Simulation, PolicyDecision, CallerRef, ActionError, AuditEvent per TDD section 3. Pure data, no I/O. Table-driven tests for invariants. Acceptance: go test ./internal/domain/... passes.",
+      "priority": "high",
+      "estimate": "2h",
+      "depends_on": [
+        "t-makefile"
+      ],
+      "feature_id": "f2-domain-storage-foundation"
+    },
+    {
+      "id": "t-action-fsm",
+      "title": "Implement Action lifecycle FSM with statekit",
+      "description": "internal/domain/action_fsm.go using statekit. Encode transitions per TDD section 3.2. Forbidden transitions return errors. Acceptance: table-driven tests cover every allowed and forbidden transition.",
+      "priority": "high",
+      "estimate": "2h",
+      "depends_on": [
+        "t-domain-types"
+      ],
+      "feature_id": "f2-domain-storage-foundation"
+    },
+    {
+      "id": "t-repository-ports",
+      "title": "Define repository ports",
+      "description": "internal/ports/ with CapabilityRepo, ActionRepo, IdempotencyRepo, AuditRepo, PolicyRepo (Phase-2 stub) per TDD section 7.1. Plus MnemosWriter outbound port. Pure interfaces. Acceptance: interfaces compile; godoc covers contract semantics.",
+      "priority": "high",
+      "estimate": "1h",
+      "depends_on": [
+        "t-domain-types"
+      ],
+      "feature_id": "f2-domain-storage-foundation"
+    },
+    {
+      "id": "t-store-test-suite",
+      "title": "Write shared store contract test suite",
+      "description": "internal/store/storetest/ - one RunSuite(t, repos) function exercising every repository port's contract. Used by all three backend tests. Acceptance: suite compiles; clear plug-in point for backend implementations.",
+      "priority": "high",
+      "estimate": "3h",
+      "depends_on": [
+        "t-repository-ports"
+      ],
+      "feature_id": "f2-domain-storage-foundation"
+    },
+    {
+      "id": "t-store-memory",
+      "title": "Implement in-memory storage backend (reference)",
+      "description": "internal/store/memory/ implementing every repo port using mutex-guarded maps. Canonical reference. Acceptance: RunSuite passes against memory backend.",
+      "priority": "high",
+      "estimate": "3h",
+      "depends_on": [
+        "t-store-test-suite"
+      ],
+      "feature_id": "f2-domain-storage-foundation"
+    },
+    {
+      "id": "t-store-sqlite",
+      "title": "Implement SQLite storage backend",
+      "description": "internal/store/sqlite/ with migrations/ (forward-only), sqlcgen/, port adapter. Schema per TDD section 7.4. modernc.org/sqlite. Acceptance: RunSuite passes; make sqlc clean.",
+      "priority": "high",
+      "estimate": "4h",
+      "depends_on": [
+        "t-store-memory",
+        "t-sqlc-config"
+      ],
+      "feature_id": "f2-domain-storage-foundation"
+    },
+    {
+      "id": "t-store-postgres",
+      "title": "Implement Postgres storage backend",
+      "description": "internal/store/postgres/ with migrations/, sqlcgen/, port adapter using pgx/v5. Schema per TDD section 7.3. Acceptance: RunSuite passes against containerized Postgres in CI; make sqlc clean.",
+      "priority": "high",
+      "estimate": "4h",
+      "depends_on": [
+        "t-store-memory",
+        "t-sqlc-config"
+      ],
+      "feature_id": "f2-domain-storage-foundation"
+    },
+    {
+      "id": "t-config-env",
+      "title": "Implement env-driven config and storage selector",
+      "description": "internal/config/ reading PRAXIS_DB_TYPE / PRAXIS_DB_CONN / PRAXIS_HTTP_PORT / PRAXIS_HTTP_HOST / PRAXIS_MNEMOS_URL / PRAXIS_MNEMOS_TOKEN / PRAXIS_HANDLER_TIMEOUT / PRAXIS_IDEMPOTENCY_TTL / PRAXIS_POLICY_MODE. internal/store/store.go with Open(ctx, cfg) (Repos, error). Acceptance: tests cover each backend selection plus error on unknown type.",
+      "priority": "high",
+      "estimate": "1h",
+      "depends_on": [
+        "t-store-memory",
+        "t-store-sqlite",
+        "t-store-postgres"
+      ],
+      "feature_id": "f2-domain-storage-foundation"
+    },
+    {
+      "id": "t-capability-registry",
+      "title": "Implement CapabilityRegistry",
+      "description": "internal/capability/ with Register(handler), List(), Get(name). Concurrent-safe. Each handler declares its Capability metadata. Acceptance: tests cover duplicate, unknown, List ordering.",
+      "priority": "high",
+      "estimate": "1h",
+      "depends_on": [
+        "t-domain-types"
+      ],
+      "feature_id": "f3-capability-registry"
+    },
+    {
+      "id": "t-schema-validator",
+      "title": "Implement schema validator",
+      "description": "internal/schema/ supporting JSON Schema (primary) and Go-struct registration. Validate input on Execute, output on handler return. Acceptance: tests cover valid, malformed, missing-field, extra-field inputs.",
+      "priority": "high",
+      "estimate": "2h",
+      "depends_on": [
+        "t-capability-registry"
+      ],
+      "feature_id": "f3-capability-registry"
+    },
+    {
+      "id": "t-policy-engine-v0",
+      "title": "Implement Phase-1 PolicyEngine (global allow)",
+      "description": "internal/policy/ with Evaluate(ctx, capability, action) PolicyDecision. Global allow-list with explainable decisions. Rule, decision, reason, timestamp on every action. Structure ready for Phase-2 scoped rules. Acceptance: every Execute and DryRun records a PolicyDecision.",
+      "priority": "high",
+      "estimate": "1h",
+      "depends_on": [
+        "t-domain-types"
+      ],
+      "feature_id": "f4-executor"
+    },
+    {
+      "id": "t-idempotency-keeper",
+      "title": "Implement IdempotencyKeeper",
+      "description": "internal/idempotency/ wrapping IdempotencyRepo. Lookup(key), Remember(key, result, ttl). Acceptance: re-execution with same key returns original Result without invoking handler.",
+      "priority": "high",
+      "estimate": "1h",
+      "depends_on": [
+        "t-store-memory",
+        "t-domain-types"
+      ],
+      "feature_id": "f4-executor"
+    },
+    {
+      "id": "t-handler-runner",
+      "title": "Implement HandlerRunner with timeouts and panic recovery",
+      "description": "internal/handlerrunner/ runs a Handler with per-capability timeout, recovers panics into structured ActionError. Classify errors retryable vs non-retryable. Acceptance: tests cover timeout, panic, returned error, clean success.",
+      "priority": "high",
+      "estimate": "1h",
+      "depends_on": [
+        "t-domain-types"
+      ],
+      "feature_id": "f4-executor"
+    },
+    {
+      "id": "t-executor-execute",
+      "title": "Implement Executor.Execute flow",
+      "description": "internal/executor/ implementing TDD section 5.2 - resolve, validate, policy, idempotency, run, audit, emit. Status transitions go through statekit FSM. Acceptance: every branch has a named test.",
+      "priority": "high",
+      "estimate": "4h",
+      "depends_on": [
+        "t-action-fsm",
+        "t-capability-registry",
+        "t-schema-validator",
+        "t-policy-engine-v0",
+        "t-idempotency-keeper",
+        "t-handler-runner"
+      ],
+      "feature_id": "f4-executor"
+    },
+    {
+      "id": "t-executor-dryrun",
+      "title": "Implement Executor.DryRun flow",
+      "description": "DryRun per TDD section 5.3 - resolve, validate, policy, handler.Simulate (or best-effort preview), audit row with Status=simulated. Zero vendor side effects. Acceptance: tests verify no outbound vendor calls; preview validated against OutputSchema where simulatable.",
+      "priority": "high",
+      "estimate": "2h",
+      "depends_on": [
+        "t-executor-execute"
+      ],
+      "feature_id": "f4-executor"
+    },
+    {
+      "id": "t-audit-log",
+      "title": "Implement AuditLog append and queries",
+      "description": "internal/audit/ with Append(ev) and Search(query). Lifecycle kinds received, validated, policy, executed, succeeded, failed, simulated. Backed by AuditRepo. Acceptance: every Executor branch writes expected audit events; search filters work.",
+      "priority": "high",
+      "estimate": "2h",
+      "depends_on": [
+        "t-executor-execute"
+      ],
+      "feature_id": "f5-audit-log"
+    },
+    {
+      "id": "t-audit-replay-test",
+      "title": "Replay-from-audit canary test",
+      "description": "Drive executor through every lifecycle path, then reconstruct action's full history from audit_events alone. The evidence-completeness canary - must always be green. Acceptance: replay matches actual lifecycle for every path.",
+      "priority": "high",
+      "estimate": "2h",
+      "depends_on": [
+        "t-audit-log",
+        "t-executor-dryrun"
+      ],
+      "feature_id": "f5-audit-log"
+    },
+    {
+      "id": "t-handler-slack-send-message",
+      "title": "Implement Slack send_message handler",
+      "description": "internal/handlers/slack/send_message.go using Slack Web API. Forward client_msg_id as idempotency key. Implement Simulate. Vendor-sandboxed integration test (skipped without SLACK_TEST_TOKEN). Acceptance: re-executing same Action.ID never posts twice in the sandbox.",
+      "priority": "high",
+      "estimate": "3h",
+      "depends_on": [
+        "t-executor-execute"
+      ],
+      "feature_id": "f6-real-handlers"
+    },
+    {
+      "id": "t-handler-smtp-send-email",
+      "title": "Implement SMTP send_email handler",
+      "description": "internal/handlers/email/send_email.go using net/smtp. Deterministic Message-ID from idempotency key. Implement Simulate. Vendor-sandboxed integration test against MailHog (skipped without SMTP_TEST_HOST). Acceptance: duplicate sends produce single message at destination.",
+      "priority": "high",
+      "estimate": "3h",
+      "depends_on": [
+        "t-executor-execute"
+      ],
+      "feature_id": "f6-real-handlers"
+    },
+    {
+      "id": "t-outcome-emitter",
+      "title": "Implement OutcomeEmitter (Mnemos writeback)",
+      "description": "internal/outcome/ posting praxis.action_completed events to Mnemos POST /v1/events. fortify/retry with Mnemos-equivalent defaults (5xx + 429 retry, 4xx fail fast, exponential backoff with jitter). Outbox in configured backend; background worker drains. Never blocks Execute. Acceptance: integration test against test Mnemos; metrics expose emit failures.",
+      "priority": "high",
+      "estimate": "3h",
+      "depends_on": [
+        "t-executor-execute",
+        "t-store-memory"
+      ],
+      "feature_id": "f7-outcome-writeback"
+    },
+    {
+      "id": "t-http-axikernel",
+      "title": "Implement HTTP API via axi-go",
+      "description": "cmd/praxis/axikernel.go wiring axi-go routes per docs/integrations.md section 2.1. Mirror Mnemos's axikernel pattern. Auth via PRAXIS_API_TOKEN. Acceptance: HTTP contract tests cover each endpoint's success and rejection paths.",
+      "priority": "high",
+      "estimate": "4h",
+      "depends_on": [
+        "t-executor-dryrun",
+        "t-audit-log"
+      ],
+      "feature_id": "f8-http-api-cli"
+    },
+    {
+      "id": "t-cli-commands",
+      "title": "Implement CLI commands",
+      "description": "cmd/praxis/main.go with subcommands praxis caps list, caps show, run, log show, serve. Acceptance: e2e tests against in-memory backend exercise each subcommand.",
+      "priority": "high",
+      "estimate": "3h",
+      "depends_on": [
+        "t-executor-dryrun",
+        "t-audit-log",
+        "t-config-env"
+      ],
+      "feature_id": "f8-http-api-cli"
+    },
+    {
+      "id": "t-observability",
+      "title": "Wire bolt logging, healthz, and Prometheus metrics",
+      "description": "Inject *bolt.Logger into every service constructor. /healthz on HTTP server. Metrics praxis_actions_total{capability,status}, praxis_action_duration_seconds, praxis_policy_decisions_total, praxis_idempotency_hits_total, praxis_outcome_emit_failures_total. Acceptance: curl /healthz returns 200; curl /metrics returns named series.",
+      "priority": "medium",
+      "estimate": "2h",
+      "depends_on": [
+        "t-http-axikernel"
+      ],
+      "feature_id": "f8-http-api-cli"
+    },
+    {
+      "id": "t-go-client",
+      "title": "Implement public Go client",
+      "description": "client/ mirroring Mnemos client patterns - New(baseURL, opts...), WithToken, WithLogger (bolt), WithRetry (fortify). Methods ListCapabilities, Execute, DryRun, GetAction. APIError type. Concurrent-safe. Acceptance: client tests against httptest server cover happy path, retry-on-5xx, fail-fast-on-4xx.",
+      "priority": "high",
+      "estimate": "3h",
+      "depends_on": [
+        "t-http-axikernel"
+      ],
+      "feature_id": "f9-public-client"
+    }
+  ],
+  "approval_status": "approved",
+  "created_at": "2026-04-27T18:59:48.399869+02:00",
+  "updated_at": "2026-04-27T18:59:48.399869+02:00"
+}

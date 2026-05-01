@@ -1,0 +1,239 @@
+{
+  "project_id": "Praxis",
+  "version": 4,
+  "task_states": {
+    "t-action-fsm": {
+      "status": "done",
+      "path": "",
+      "elapsed_minutes": 60,
+      "owner": "ai-agent",
+      "started_at": "2026-05-01T08:32:46.253850+00:00",
+      "completed_at": "2026-05-01T08:32:46.253850+00:00"
+    },
+    "t-audit-log": {
+      "status": "done",
+      "path": "",
+      "elapsed_minutes": 60,
+      "owner": "ai-agent",
+      "started_at": "2026-05-01T08:32:46.253850+00:00",
+      "completed_at": "2026-05-01T08:32:46.253850+00:00"
+    },
+    "t-audit-replay-test": {
+      "status": "done",
+      "path": "",
+      "elapsed_minutes": 60,
+      "owner": "ai-agent",
+      "started_at": "2026-05-01T08:32:46.253850+00:00",
+      "completed_at": "2026-05-01T08:32:46.253850+00:00"
+    },
+    "t-capability-registry": {
+      "status": "done",
+      "path": "",
+      "elapsed_minutes": 60,
+      "owner": "ai-agent",
+      "started_at": "2026-05-01T08:32:46.253850+00:00",
+      "completed_at": "2026-05-01T08:32:46.253850+00:00"
+    },
+    "t-cli-commands": {
+      "status": "done",
+      "path": "",
+      "elapsed_minutes": 60,
+      "owner": "ai-agent",
+      "started_at": "2026-05-01T08:32:46.253850+00:00",
+      "completed_at": "2026-05-01T08:32:46.253850+00:00"
+    },
+    "t-config-env": {
+      "status": "done",
+      "path": "",
+      "elapsed_minutes": 60,
+      "owner": "ai-agent",
+      "started_at": "2026-05-01T08:32:46.253850+00:00",
+      "completed_at": "2026-05-01T08:32:46.253850+00:00"
+    },
+    "t-domain-types": {
+      "status": "done",
+      "path": "",
+      "elapsed_minutes": 60,
+      "owner": "ai-agent",
+      "started_at": "2026-05-01T08:32:46.253850+00:00",
+      "completed_at": "2026-05-01T08:32:46.253850+00:00"
+    },
+    "t-executor-dryrun": {
+      "status": "done",
+      "path": "",
+      "elapsed_minutes": 60,
+      "owner": "ai-agent",
+      "started_at": "2026-05-01T08:32:46.253850+00:00",
+      "completed_at": "2026-05-01T08:32:46.253850+00:00"
+    },
+    "t-executor-execute": {
+      "status": "done",
+      "path": "",
+      "elapsed_minutes": 60,
+      "owner": "ai-agent",
+      "started_at": "2026-05-01T08:32:46.253850+00:00",
+      "completed_at": "2026-05-01T08:32:46.253850+00:00"
+    },
+    "t-gitignore-editorconfig": {
+      "status": "done",
+      "path": "",
+      "elapsed_minutes": 60,
+      "owner": "ai-agent",
+      "started_at": "2026-05-01T08:32:46.253850+00:00",
+      "completed_at": "2026-05-01T08:32:46.253850+00:00"
+    },
+    "t-go-client": {
+      "status": "done",
+      "path": "",
+      "elapsed_minutes": 60,
+      "owner": "ai-agent",
+      "started_at": "2026-05-01T08:32:46.253850+00:00",
+      "completed_at": "2026-05-01T08:32:46.253850+00:00"
+    },
+    "t-handler-runner": {
+      "status": "done",
+      "path": "",
+      "elapsed_minutes": 60,
+      "owner": "ai-agent",
+      "started_at": "2026-05-01T08:32:46.253850+00:00",
+      "completed_at": "2026-05-01T08:32:46.253850+00:00"
+    },
+    "t-handler-slack-send-message": {
+      "status": "done",
+      "path": "",
+      "elapsed_minutes": 60,
+      "owner": "ai-agent",
+      "started_at": "2026-05-01T08:32:46.253850+00:00",
+      "completed_at": "2026-05-01T08:32:46.253850+00:00"
+    },
+    "t-handler-smtp-send-email": {
+      "status": "done",
+      "path": "",
+      "elapsed_minutes": 60,
+      "owner": "ai-agent",
+      "started_at": "2026-05-01T08:32:46.253850+00:00",
+      "completed_at": "2026-05-01T08:32:46.253850+00:00"
+    },
+    "t-http-axikernel": {
+      "status": "done",
+      "path": "",
+      "elapsed_minutes": 60,
+      "owner": "ai-agent",
+      "started_at": "2026-05-01T08:32:46.253850+00:00",
+      "completed_at": "2026-05-01T08:32:46.253850+00:00"
+    },
+    "t-idempotency-keeper": {
+      "status": "done",
+      "path": "",
+      "elapsed_minutes": 60,
+      "owner": "ai-agent",
+      "started_at": "2026-05-01T08:32:46.253850+00:00",
+      "completed_at": "2026-05-01T08:32:46.253850+00:00"
+    },
+    "t-init-go-module": {
+      "status": "done",
+      "path": "",
+      "owner": "ai-agent",
+      "started_at": "2026-04-27T19:06:17.659859+02:00",
+      "completed_at": "2026-04-30T19:38:40.131182+02:00",
+      "elapsed_minutes": 4352
+    },
+    "t-license": {
+      "status": "done",
+      "path": "",
+      "elapsed_minutes": 60,
+      "owner": "ai-agent",
+      "started_at": "2026-05-01T08:32:46.253850+00:00",
+      "completed_at": "2026-05-01T08:32:46.253850+00:00"
+    },
+    "t-makefile": {
+      "status": "done",
+      "path": "",
+      "elapsed_minutes": 60,
+      "owner": "ai-agent",
+      "started_at": "2026-05-01T08:32:46.253850+00:00",
+      "completed_at": "2026-05-01T08:32:46.253850+00:00"
+    },
+    "t-observability": {
+      "status": "done",
+      "path": "",
+      "elapsed_minutes": 60,
+      "owner": "ai-agent",
+      "started_at": "2026-05-01T08:32:46.253850+00:00",
+      "completed_at": "2026-05-01T08:32:46.253850+00:00"
+    },
+    "t-outcome-emitter": {
+      "status": "done",
+      "path": "",
+      "elapsed_minutes": 60,
+      "owner": "ai-agent",
+      "started_at": "2026-05-01T08:32:46.253850+00:00",
+      "completed_at": "2026-05-01T08:32:46.253850+00:00"
+    },
+    "t-policy-engine-v0": {
+      "status": "done",
+      "path": "",
+      "elapsed_minutes": 60,
+      "owner": "ai-agent",
+      "started_at": "2026-05-01T08:32:46.253850+00:00",
+      "completed_at": "2026-05-01T08:32:46.253850+00:00"
+    },
+    "t-repository-ports": {
+      "status": "done",
+      "path": "",
+      "elapsed_minutes": 60,
+      "owner": "ai-agent",
+      "started_at": "2026-05-01T08:32:46.253850+00:00",
+      "completed_at": "2026-05-01T08:32:46.253850+00:00"
+    },
+    "t-schema-validator": {
+      "status": "done",
+      "path": "",
+      "elapsed_minutes": 60,
+      "owner": "ai-agent",
+      "started_at": "2026-05-01T08:32:46.253850+00:00",
+      "completed_at": "2026-05-01T08:32:46.253850+00:00"
+    },
+    "t-sqlc-config": {
+      "status": "done",
+      "path": "",
+      "elapsed_minutes": 60,
+      "owner": "ai-agent",
+      "started_at": "2026-05-01T08:32:46.253850+00:00",
+      "completed_at": "2026-05-01T08:32:46.253850+00:00"
+    },
+    "t-store-memory": {
+      "status": "done",
+      "path": "",
+      "elapsed_minutes": 60,
+      "owner": "ai-agent",
+      "started_at": "2026-05-01T08:32:46.253850+00:00",
+      "completed_at": "2026-05-01T08:32:46.253850+00:00"
+    },
+    "t-store-postgres": {
+      "status": "done",
+      "path": "",
+      "elapsed_minutes": 60,
+      "owner": "ai-agent",
+      "started_at": "2026-05-01T08:32:46.253850+00:00",
+      "completed_at": "2026-05-01T08:32:46.253850+00:00"
+    },
+    "t-store-sqlite": {
+      "status": "done",
+      "path": "",
+      "elapsed_minutes": 60,
+      "owner": "ai-agent",
+      "started_at": "2026-05-01T08:32:46.253850+00:00",
+      "completed_at": "2026-05-01T08:32:46.253850+00:00"
+    },
+    "t-store-test-suite": {
+      "status": "done",
+      "path": "",
+      "elapsed_minutes": 60,
+      "owner": "ai-agent",
+      "started_at": "2026-05-01T08:32:46.253850+00:00",
+      "completed_at": "2026-05-01T08:32:46.253850+00:00"
+    }
+  },
+  "updated_at": "2026-04-30T19:38:40.131182+02:00"
+}

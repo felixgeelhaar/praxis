@@ -1,0 +1,40 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(awk '{print $NF}')",
+      "mcp__roady__roady_init",
+      "mcp__roady__roady_get_spec",
+      "mcp__roady__roady_review_spec",
+      "mcp__roady__roady_smart_decompose",
+      "mcp__roady__roady_update_plan",
+      "Bash(python3 -c \"import yaml,sys; yaml.safe_load\\(open\\('/Users/felixgeelhaar/Developer/projects/business-felix-geelhaar/praxis/.roady/spec.yaml'\\)\\)\")",
+      "Bash(python3 -c \"import json; print\\(json.dumps\\({}\\)\\)\")",
+      "Read(//Users/felixgeelhaar/.cargo/bin/**)",
+      "mcp__roady__roady_check_policy",
+      "mcp__roady__roady_get_plan",
+      "mcp__roady__roady_approve_plan",
+      "mcp__roady__roady_get_ready_tasks",
+      "mcp__roady__roady_transition_task",
+      "Bash(go version *)",
+      "Bash(go build *)",
+      "Bash(go test *)",
+      "Bash(go vet *)",
+      "Bash(git init *)",
+      "Bash(git config *)",
+      "Bash(make fmt *)",
+      "Bash(go get *)",
+      "Bash(go doc *)",
+      "Bash(go mod *)",
+      "Bash(command -v sqlc)",
+      "Bash(sqlc version *)",
+      "Bash(sqlc generate *)",
+      "Bash(make check *)",
+      "Bash(python3 -c ' *)",
+      "Bash(./bin/praxis version *)",
+      "Bash(./bin/praxis caps *)",
+      "Bash(./bin/praxis run *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)"
+    ]
+  }
+}

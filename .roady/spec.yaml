@@ -1,0 +1,42 @@
+id: Praxis
+title: Praxis
+description: Execution layer of the four-system cognitive stack (Mnemos, Chronos, Nous, Praxis). Exposes a registry of capabilities and executes actions under policy with idempotency, dry-run, and audit. Praxis does not decide; that belongs to Nous. This spec scopes Phase 1 (MVP) plus the foundation scaffolding to make the documented patterns runnable.
+features:
+    - id: f1-foundation-scaffolding
+      title: Foundation Scaffolding
+      description: Repo scaffolding to make the documented patterns runnable. Go module pinned to Mnemos foundation library versions (bolt, fortify, mcp-go, statekit, axi-go), Makefile mirroring Mnemos targets, sqlc.yaml for sqlite + postgres engines, .gitignore, .editorconfig, .golangci.yml, MIT LICENSE.
+      requirements: []
+    - id: f2-domain-storage-foundation
+      title: Domain and Storage Foundation
+      description: DDD domain types (Capability, Action, Result, Simulation, PolicyDecision, CallerRef, ActionError, AuditEvent), statekit-backed Action lifecycle FSM, repository ports, and three storage backends (memory as canonical reference, sqlite local-first, postgres production) behind a shared store contract test suite. Backend selection via PRAXIS_DB_TYPE / PRAXIS_DB_CONN.
+      requirements: []
+    - id: f3-capability-registry
+      title: Capability Registry and Schema Validation
+      description: In-process CapabilityRegistry with programmatic Register(handler), and a schema validator gating every Execute and DryRun. Validates Action.Payload against InputSchema before any side effect and handler Output against OutputSchema after execution. Supports JSON Schema and Go-struct registration.
+      requirements: []
+    - id: f4-executor
+      title: Executor (Execute and DryRun)
+      description: Linear executor flow per TDD section 5 - resolve capability, validate schema, evaluate policy, check idempotency, run handler with timeout and panic recovery, persist result and audit, emit outcome. Phase-1 PolicyEngine is a global allow-list with explainable PolicyDecision recorded on every action. Status transitions go through the statekit FSM.
+      requirements: []
+    - id: f5-audit-log
+      title: Audit Log
+      description: Append-only record of every action lifecycle event (received, validated, policy, executed, succeeded, failed, simulated). Search by capability, caller, time window, action ID. Replay-from-audit canary test reconstructs an action's full lifecycle from audit_events alone and must always pass.
+      requirements: []
+    - id: f6-real-handlers
+      title: Real Capability Handlers
+      description: Two production-quality handlers proving the abstraction. send_message via Slack Web API forwarding client_msg_id for idempotency. send_email via SMTP with deterministic Message-ID. Vendor-sandboxed integration tests skipped without credentials. Errors classified as retryable vs non-retryable.
+      requirements: []
+    - id: f7-outcome-writeback
+      title: Outcome Writeback to Mnemos
+      description: After every terminal action, post a praxis.action_completed event to Mnemos so the cognitive loop closes. fortify/retry with Mnemos-equivalent defaults (5xx + 429 retry, 4xx fail fast, exponential backoff with jitter). Outbox-and-retry on Mnemos unavailability; never block Execute. Configurable via PRAXIS_MNEMOS_URL / PRAXIS_MNEMOS_TOKEN.
+      requirements: []
+    - id: f8-http-api-cli
+      title: HTTP API and CLI
+      description: Public surface for callers - axi-go HTTP server (cmd/praxis/axikernel.go mirroring Mnemos's axikernel pattern) and CLI wrapping the same executor. Endpoints GET /health, GET /v1/capabilities, GET /v1/capabilities/{name}, POST /v1/actions, GET /v1/actions/{id}, POST /v1/actions/{id}/dry-run, GET /v1/audit. CLI commands praxis caps list/show, praxis run, praxis log show, praxis serve. Structured logs via bolt; basic Prometheus metrics.
+      requirements: []
+    - id: f9-public-client
+      title: Public Go Client
+      description: Typed Go client for callers, mirroring Mnemos client patterns. New constructor accepting WithToken, WithLogger (bolt), WithRetry (fortify). Methods ListCapabilities, Execute, DryRun, GetAction. APIError type with status + message, errors.As-friendly. Safe for concurrent use.
+      requirements: []
+constraints: []
+version: 0.1.0
