@@ -56,6 +56,10 @@ sqlc:
 .PHONY: check
 check: fmt vet test build
 
+.PHONY: bench
+bench:
+	go test -bench=. -benchmem -run=^$$ -count=10 -benchtime=1s ./internal/executor/...
+
 .PHONY: release-check
 release-check: fmt vet lint test build
 
