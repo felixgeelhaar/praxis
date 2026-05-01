@@ -30,3 +30,7 @@ coverage.html
 
 # tmp
 tmp/
+
+# Bench output (current.txt is a transient artefact of `make bench-check`;
+# baseline.txt IS committed)
+bench/current.txt

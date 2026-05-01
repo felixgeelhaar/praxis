@@ -1,0 +1,39 @@
+goos: darwin
+goarch: arm64
+pkg: github.com/felixgeelhaar/praxis/internal/executor
+cpu: Apple M5
+BenchmarkExecute_Memory-10             	   90312	      6233 ns/op	    8107 B/op	      90 allocs/op
+BenchmarkExecute_Memory-10             	  109390	      5961 ns/op	    8189 B/op	      90 allocs/op
+BenchmarkExecute_Memory-10             	  108321	      5875 ns/op	    8220 B/op	      90 allocs/op
+BenchmarkExecute_Memory-10             	  110449	      5927 ns/op	    8167 B/op	      90 allocs/op
+BenchmarkExecute_Memory-10             	  107506	      5741 ns/op	    8244 B/op	      90 allocs/op
+BenchmarkExecute_Memory_Parallel-10    	  136674	      4872 ns/op	    8360 B/op	      89 allocs/op
+BenchmarkExecute_Memory_Parallel-10    	  138586	      4706 ns/op	    8315 B/op	      89 allocs/op
+BenchmarkExecute_Memory_Parallel-10    	  125413	      4983 ns/op	    8654 B/op	      89 allocs/op
+BenchmarkExecute_Memory_Parallel-10    	  101510	      5309 ns/op	    8524 B/op	      89 allocs/op
+BenchmarkExecute_Memory_Parallel-10    	  132079	      4690 ns/op	    8474 B/op	      89 allocs/op
+BenchmarkDryRun_Memory-10              	  238364	      2651 ns/op	    5121 B/op	      52 allocs/op
+BenchmarkDryRun_Memory-10              	  238204	      2692 ns/op	    5123 B/op	      52 allocs/op
+BenchmarkDryRun_Memory-10              	  233362	      2793 ns/op	    5151 B/op	      52 allocs/op
+BenchmarkDryRun_Memory-10              	  232659	      2578 ns/op	    5155 B/op	      52 allocs/op
+BenchmarkDryRun_Memory-10              	  242745	      2652 ns/op	    5092 B/op	      52 allocs/op
+PASS
+ok  	github.com/felixgeelhaar/praxis/internal/executor	10.814s
+goos: darwin
+goarch: arm64
+pkg: github.com/felixgeelhaar/praxis/internal/plugin
+cpu: Apple M5
+BenchmarkProcessOpener_Execute-10             	   73024	      8210 ns/op	    3235 B/op	      56 allocs/op
+BenchmarkProcessOpener_Execute-10             	   74334	      8191 ns/op	    3235 B/op	      56 allocs/op
+BenchmarkProcessOpener_Execute-10             	   73482	      8200 ns/op	    3235 B/op	      56 allocs/op
+BenchmarkProcessOpener_Execute-10             	   73830	      8170 ns/op	    3235 B/op	      56 allocs/op
+BenchmarkProcessOpener_Execute-10             	   74197	      8087 ns/op	    3235 B/op	      56 allocs/op
+BenchmarkProcessOpener_Execute_Parallel-10    	  126694	      4840 ns/op	    3233 B/op	      56 allocs/op
+BenchmarkProcessOpener_Execute_Parallel-10    	  127939	      4868 ns/op	    3233 B/op	      56 allocs/op
+BenchmarkProcessOpener_Execute_Parallel-10    	  125348	      4872 ns/op	    3233 B/op	      56 allocs/op
+BenchmarkProcessOpener_Execute_Parallel-10    	  118696	      4994 ns/op	    3233 B/op	      56 allocs/op
+BenchmarkProcessOpener_Execute_Parallel-10    	  124413	      4861 ns/op	    3234 B/op	      56 allocs/op
+PASS
+ok  	github.com/felixgeelhaar/praxis/internal/plugin	7.052s
+PASS
+ok  	github.com/felixgeelhaar/praxis/internal/plugin/ipc	0.330s

@@ -60,6 +60,17 @@ check: fmt vet test build
 bench:
 	go test -bench=. -benchmem -run=^$$ -count=10 -benchtime=1s ./internal/executor/... ./internal/plugin/...
 
+# bench-check captures a fresh `go test -bench` run and compares it
+# against bench/baseline.txt via cmd/benchcheck. Fails when any
+# benchmark regresses past the threshold (default 1.20x baseline).
+# Refresh the baseline by running:
+#   make bench > bench/baseline.txt
+.PHONY: bench-check
+bench-check:
+	@mkdir -p bench
+	@go test -bench=. -benchmem -run=^$$ -count=5 -benchtime=500ms ./internal/executor/... ./internal/plugin/... > bench/current.txt
+	@go run ./cmd/benchcheck -baseline bench/baseline.txt -current bench/current.txt
+
 .PHONY: release-check
 release-check: fmt vet lint test build
 
