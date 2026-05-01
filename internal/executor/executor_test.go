@@ -463,3 +463,97 @@ func containsSequence(haystack, needle []string) bool {
 	}
 	return false
 }
+
+// --- Phase 3 M3.3: tenant-private capability isolation ---
+
+func newHarnessNoRegister(t *testing.T) (*harness, *capability.Registry) {
+	t.Helper()
+	logger := bolt.New(bolt.NewJSONHandler(io.Discard))
+	repos := memory.New()
+
+	registry := capability.New()
+	pol := policy.New(logger, repos.Policy)
+	idem := idempotency.New(repos.Idempotency)
+	runner := handlerrunner.New(logger, handlerrunner.Config{MaxAttempts: 1})
+	validator := schema.New()
+	outcomes := &capturingOutcomes{}
+
+	exec := executor.New(logger, registry, pol, idem, runner, validator,
+		repos.Action, repos.Audit, outcomes)
+	exec.SetClock(deterministicClock())
+
+	return &harness{exec: exec, repos: repos, outcomes: outcomes}, registry
+}
+
+func TestExecute_TenantPrivateCapabilityResolves(t *testing.T) {
+	h, registry := newHarnessNoRegister(t)
+	priv := &fakeHandler{name: "tenant_only", output: map[string]any{"ok": true}}
+	if err := registry.RegisterTenant("org-a", priv); err != nil {
+		t.Fatalf("RegisterTenant: %v", err)
+	}
+
+	action := domain.Action{
+		ID: "a1", Capability: "tenant_only",
+		Payload: map[string]any{},
+		Caller:  domain.CallerRef{Type: "user", ID: "u-1", OrgID: "org-a"},
+	}
+	res, err := h.exec.Execute(context.Background(), action)
+	if err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	if res.Status != domain.StatusSucceeded {
+		t.Errorf("Status=%s want succeeded", res.Status)
+	}
+	if priv.callCount != 1 {
+		t.Errorf("callCount=%d want 1", priv.callCount)
+	}
+}
+
+func TestExecute_TenantIsolation_OtherOrgRejected(t *testing.T) {
+	h, registry := newHarnessNoRegister(t)
+	priv := &fakeHandler{name: "tenant_only", output: map[string]any{"ok": true}}
+	_ = registry.RegisterTenant("org-a", priv)
+
+	action := domain.Action{
+		ID: "a2", Capability: "tenant_only",
+		Payload: map[string]any{},
+		Caller:  domain.CallerRef{Type: "user", ID: "u-1", OrgID: "org-b"},
+	}
+	res, _ := h.exec.Execute(context.Background(), action)
+	if res.Status != domain.StatusRejected {
+		t.Errorf("Status=%s want rejected", res.Status)
+	}
+	if res.Error == nil || res.Error.Code != "unknown_capability" {
+		t.Errorf("Error=%+v want unknown_capability", res.Error)
+	}
+	if priv.callCount != 0 {
+		t.Errorf("org-a's handler should not have run for org-b; calls=%d", priv.callCount)
+	}
+}
+
+func TestListCapabilitiesForCaller_PassesThroughExecutor(t *testing.T) {
+	h, registry := newHarnessNoRegister(t)
+	_ = registry.Register(&fakeHandler{name: "global"})
+	_ = registry.RegisterTenant("org-a", &fakeHandler{name: "a_priv"})
+
+	caps, err := h.exec.ListCapabilitiesForCaller(context.Background(),
+		domain.CallerRef{OrgID: "org-a"})
+	if err != nil {
+		t.Fatalf("ListCapabilitiesForCaller: %v", err)
+	}
+	names := map[string]bool{}
+	for _, c := range caps {
+		names[c.Name] = true
+	}
+	if !names["global"] || !names["a_priv"] {
+		t.Errorf("org-a missing caps: %v", names)
+	}
+
+	caps, _ = h.exec.ListCapabilitiesForCaller(context.Background(),
+		domain.CallerRef{OrgID: "org-b"})
+	for _, c := range caps {
+		if c.Name == "a_priv" {
+			t.Errorf("org-b leaked org-a's private cap")
+		}
+	}
+}

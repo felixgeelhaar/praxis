@@ -104,7 +104,7 @@ func (e *Executor) Execute(ctx context.Context, action domain.Action) (domain.Re
 	}
 	e.appendAudit(ctx, action, audit.KindReceived, map[string]any{"payload_keys": keys(action.Payload)})
 
-	cap, err := e.registry.GetCapability(action.Capability)
+	cap, err := e.registry.GetCapabilityForCaller(action.Capability, action.Caller)
 	if err != nil {
 		return e.reject(ctx, action, "unknown_capability", err.Error())
 	}
@@ -161,7 +161,7 @@ func (e *Executor) Execute(ctx context.Context, action domain.Action) (domain.Re
 	_ = e.actions.Save(ctx, action)
 	e.appendAudit(ctx, action, audit.KindExecuted, nil)
 
-	handler, herr := e.registry.GetHandler(action.Capability)
+	handler, herr := e.registry.GetHandlerForCaller(action.Capability, action.Caller)
 	if herr != nil {
 		return e.terminateWithTimes(ctx, action, startedAt, e.now(), nil, &domain.ActionError{
 			Code: "unknown_handler", Message: herr.Error(),
@@ -201,7 +201,7 @@ func (e *Executor) DryRun(ctx context.Context, action domain.Action) (domain.Sim
 	}
 	e.appendAudit(ctx, action, audit.KindReceived, map[string]any{"dry_run": true})
 
-	cap, err := e.registry.GetCapability(action.Capability)
+	cap, err := e.registry.GetCapabilityForCaller(action.Capability, action.Caller)
 	if err != nil {
 		_, _ = e.reject(ctx, action, "unknown_capability", err.Error())
 		return domain.Simulation{}, err
@@ -222,7 +222,7 @@ func (e *Executor) DryRun(ctx context.Context, action domain.Action) (domain.Sim
 	preview := map[string]any{"note": "capability not simulatable; preview limited to validation + policy"}
 	reversible := false
 	if cap.Simulatable {
-		if handler, herr := e.registry.GetHandler(action.Capability); herr == nil {
+		if handler, herr := e.registry.GetHandlerForCaller(action.Capability, action.Caller); herr == nil {
 			if p, perr := e.runner.Simulate(ctx, handler, action.Payload); perr == nil {
 				preview = p
 				reversible = true
@@ -250,9 +250,18 @@ func (e *Executor) DryRun(ctx context.Context, action domain.Action) (domain.Sim
 }
 
 // ListCapabilities is a thin pass-through to the registry, kept on the
-// Executor so the public API surface stays at three verbs.
+// Executor so the public API surface stays at three verbs. Returns only
+// globally-registered capabilities; tenant-private caps are reachable
+// via ListCapabilitiesForCaller.
 func (e *Executor) ListCapabilities(ctx context.Context) ([]domain.Capability, error) {
 	return e.registry.ListCapabilities(ctx)
+}
+
+// ListCapabilitiesForCaller returns global capabilities plus the caller's
+// tenant-private ones. An empty CallerRef returns the same set as
+// ListCapabilities. Phase 3 M3.3.
+func (e *Executor) ListCapabilitiesForCaller(ctx context.Context, caller domain.CallerRef) ([]domain.Capability, error) {
+	return e.registry.ListCapabilitiesForCaller(ctx, caller)
 }
 
 // ErrNotReversible signals that the original action's capability does not
@@ -273,7 +282,7 @@ func (e *Executor) Revert(ctx context.Context, actionID string) (domain.Result, 
 	if original.Status != domain.StatusSucceeded {
 		return domain.Result{}, fmt.Errorf("revert: action %s status is %s, not succeeded", actionID, original.Status)
 	}
-	handler, herr := e.registry.GetHandler(original.Capability)
+	handler, herr := e.registry.GetHandlerForCaller(original.Capability, original.Caller)
 	if herr != nil {
 		return domain.Result{}, fmt.Errorf("revert: %w", herr)
 	}
@@ -328,7 +337,7 @@ func (e *Executor) Revert(ctx context.Context, actionID string) (domain.Result, 
 // IdempotencyKeeper layer: a duplicate Resume call will short-circuit on the
 // remembered result.
 func (e *Executor) Resume(ctx context.Context, action domain.Action) (domain.Result, error) {
-	cap, err := e.registry.GetCapability(action.Capability)
+	cap, err := e.registry.GetCapabilityForCaller(action.Capability, action.Caller)
 	if err != nil {
 		return e.reject(ctx, action, "unknown_capability", err.Error())
 	}
@@ -345,7 +354,7 @@ func (e *Executor) Resume(ctx context.Context, action domain.Action) (domain.Res
 	_ = e.actions.Save(ctx, action)
 	e.appendAudit(ctx, action, audit.KindExecuted, nil)
 
-	handler, herr := e.registry.GetHandler(action.Capability)
+	handler, herr := e.registry.GetHandlerForCaller(action.Capability, action.Caller)
 	if herr != nil {
 		return e.terminateWithTimes(ctx, action, startedAt, e.now(), nil, &domain.ActionError{
 			Code: "unknown_handler", Message: herr.Error(),

@@ -111,7 +111,8 @@ func newMux(deps kernelDeps, m *metrics) *http.ServeMux {
 	}
 
 	mux.Handle("GET /v1/capabilities", traced(authed(func(w http.ResponseWriter, r *http.Request) {
-		caps, err := deps.exec.ListCapabilities(r.Context())
+		caller := callerFromHeaders(r)
+		caps, err := deps.exec.ListCapabilitiesForCaller(r.Context(), caller)
 		if err != nil {
 			writeJSON(w, http.StatusInternalServerError, errResponse(err.Error()))
 			return
@@ -121,7 +122,8 @@ func newMux(deps kernelDeps, m *metrics) *http.ServeMux {
 
 	mux.Handle("GET /v1/capabilities/{name}", traced(authed(func(w http.ResponseWriter, r *http.Request) {
 		name := r.PathValue("name")
-		cap, err := deps.registry.GetCapability(name)
+		caller := callerFromHeaders(r)
+		cap, err := deps.registry.GetCapabilityForCaller(name, caller)
 		if err != nil {
 			writeJSON(w, http.StatusNotFound, errResponse("capability not found"))
 			return
@@ -301,6 +303,19 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 
 func errResponse(msg string) map[string]any {
 	return map[string]any{"error": msg}
+}
+
+// callerFromHeaders builds a CallerRef from optional X-Praxis-* headers so
+// tenant-private capabilities resolve correctly on read endpoints (Phase 3
+// M3.3). Empty headers degrade to an anonymous (global-only) caller.
+func callerFromHeaders(r *http.Request) domain.CallerRef {
+	return domain.CallerRef{
+		Type:   r.Header.Get("X-Praxis-Caller-Type"),
+		ID:     r.Header.Get("X-Praxis-Caller-ID"),
+		Name:   r.Header.Get("X-Praxis-Caller-Name"),
+		OrgID:  r.Header.Get("X-Praxis-Org-ID"),
+		TeamID: r.Header.Get("X-Praxis-Team-ID"),
+	}
 }
 
 func decodeAction(r *http.Request) (domain.Action, error) {
