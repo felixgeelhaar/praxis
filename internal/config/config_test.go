@@ -97,6 +97,43 @@ func TestLoad_AuditRetention_DropsMalformed(t *testing.T) {
 	}
 }
 
+func TestLoad_AuditRetentionInterval_Default(t *testing.T) {
+	t.Setenv("PRAXIS_AUDIT_RETENTION_INTERVAL", "")
+	c, err := config.Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if c.AuditRetentionInterval != time.Hour {
+		t.Errorf("Interval=%v want 1h", c.AuditRetentionInterval)
+	}
+}
+
+func TestLoad_AuditRetentionInitialDelay_Default(t *testing.T) {
+	t.Setenv("PRAXIS_AUDIT_RETENTION_INITIAL_DELAY", "")
+	c, err := config.Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if c.AuditRetentionInitialDelay != 5*time.Minute {
+		t.Errorf("InitialDelay=%v want 5m", c.AuditRetentionInitialDelay)
+	}
+}
+
+func TestLoad_AuditRetentionInterval_Override(t *testing.T) {
+	t.Setenv("PRAXIS_AUDIT_RETENTION_INTERVAL", "15m")
+	t.Setenv("PRAXIS_AUDIT_RETENTION_INITIAL_DELAY", "30s")
+	c, err := config.Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if c.AuditRetentionInterval != 15*time.Minute {
+		t.Errorf("Interval=%v", c.AuditRetentionInterval)
+	}
+	if c.AuditRetentionInitialDelay != 30*time.Second {
+		t.Errorf("InitialDelay=%v", c.AuditRetentionInitialDelay)
+	}
+}
+
 func TestLoad_PluginStrict_Default(t *testing.T) {
 	t.Setenv("PRAXIS_PLUGIN_STRICT", "")
 	c, err := config.Load()

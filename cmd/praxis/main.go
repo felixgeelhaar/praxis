@@ -263,6 +263,14 @@ func runServe() int {
 	jobsRunner := jobs.New(rt.logger, rt.repos.Action, rt.exec, jobs.Config{})
 	go jobsRunner.Run(ctx)
 
+	if len(rt.cfg.AuditRetention) > 0 {
+		sched := audit.NewScheduler(rt.auditSvc, rt.logger, audit.SchedulerConfig{
+			InitialDelay: rt.cfg.AuditRetentionInitialDelay,
+			Interval:     rt.cfg.AuditRetentionInterval,
+		})
+		go sched.Run(ctx)
+	}
+
 	mux := newMux(kernelDeps{
 		logger: rt.logger, exec: rt.exec, registry: rt.reg, repos: rt.repos,
 		auditSvc: rt.auditSvc,
