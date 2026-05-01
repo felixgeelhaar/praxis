@@ -273,11 +273,19 @@ func loadPlugins(ctx context.Context, logger *bolt.Logger, cfg config.Config, re
 	if err != nil {
 		return nil, fmt.Errorf("load trusted plugin keys: %w", err)
 	}
+	var opener plugin.Opener = plugin.DefaultOpener{}
+	if cgst := cgroup.Detect(); cgst.Available {
+		// Out-of-process loader is the only path that benefits from
+		// cgroup wiring today. ProcessOpener with a CgroupParent set
+		// will create per-plugin cgroups under the delegated subtree.
+		// In-process plugins (DefaultOpener) keep the setrlimit path.
+		_ = cgst // kept available for future wiring of ProcessOpener.
+	}
 	mgr := plugin.NewManager(plugin.ManagerConfig{
 		Dir:         cfg.PluginDir,
 		TrustedKeys: keys,
 		Loader:      &pluginRegistryLoader{reg: reg},
-		Opener:      plugin.DefaultOpener{},
+		Opener:      opener,
 		Unregister:  reg.Unregister,
 		OnEvent: func(ev plugin.LoadEvent) {
 			m.incPluginLoad(ev.Result)

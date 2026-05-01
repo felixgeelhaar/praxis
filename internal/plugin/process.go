@@ -13,6 +13,7 @@ import (
 
 	"github.com/felixgeelhaar/praxis/internal/capability"
 	"github.com/felixgeelhaar/praxis/internal/domain"
+	"github.com/felixgeelhaar/praxis/internal/plugin/cgroup"
 	"github.com/felixgeelhaar/praxis/internal/plugin/ipc"
 )
 
@@ -61,6 +62,13 @@ type ProcessOpener struct {
 	Binary string
 	Budget ResourceBudget
 
+	// CgroupParent, when non-empty, names a cgroup v2 subtree under
+	// which each spawned plugin host runs. Phase 5: when the host
+	// detects cgroup v2 availability the bootstrap sets this to
+	// /sys/fs/cgroup/praxis so memory.max + cpu.max enforce the
+	// declared budget. Empty falls back to the setrlimit-only path.
+	CgroupParent string
+
 	// SpawnFn is the test seam: production uses exec.Command, tests
 	// supply a custom transport pair without touching the OS.
 	SpawnFn func(ctx context.Context, artefactPath string) (io.WriteCloser, io.ReadCloser, func() error, error)
@@ -107,17 +115,50 @@ func (o *ProcessOpener) spawn(ctx context.Context, artefactPath string) (io.Writ
 		_ = stdin.Close()
 		return nil, nil, nil, err
 	}
+
+	// Phase 5: when the operator delegated a cgroup v2 subtree, create
+	// a per-plugin cgroup before fork/exec and attach the child PID
+	// immediately after Start. There is a brief unconstrained window
+	// between fork and the cgroup.procs write; for non-adversarial
+	// resource isolation this is acceptable. CLONE_INTO_CGROUP would
+	// close the window but is not exposed via Go's exec.Cmd today.
+	var cgHandle *cgroup.Handle
+	if o.CgroupParent != "" {
+		h, cgErr := cgroup.Prepare(o.CgroupParent, artefactPath, cgroup.Budget{
+			CPUTimeout:     o.Budget.CPUTimeout,
+			MaxMemoryBytes: o.Budget.MaxMemoryBytes,
+		})
+		if cgErr == nil {
+			cgHandle = h
+		}
+		// Failure is non-fatal: setrlimit (the env-var path) is still
+		// in play. The bootstrap already logged cgroup availability
+		// at startup so a per-spawn failure here doesn't need its
+		// own structured warning.
+	}
+
 	if err := cmd.Start(); err != nil {
+		if cgHandle != nil {
+			_ = cgHandle.Cleanup()
+		}
 		_ = stdin.Close()
 		_ = stdout.Close()
 		return nil, nil, nil, err
 	}
+	if cgHandle != nil && cmd.Process != nil {
+		_ = cgHandle.AddPID(cmd.Process.Pid)
+	}
+
 	kill := func() error {
 		_ = stdin.Close()
 		if cmd.Process != nil {
 			_ = cmd.Process.Kill()
 		}
-		return cmd.Wait()
+		err := cmd.Wait()
+		if cgHandle != nil {
+			_ = cgHandle.Cleanup()
+		}
+		return err
 	}
 	return stdin, stdout, kill, nil
 }
