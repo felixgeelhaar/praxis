@@ -42,6 +42,7 @@ import (
 	"github.com/felixgeelhaar/praxis/internal/observability"
 	"github.com/felixgeelhaar/praxis/internal/outcome"
 	"github.com/felixgeelhaar/praxis/internal/plugin"
+	"github.com/felixgeelhaar/praxis/internal/plugin/cgroup"
 	"github.com/felixgeelhaar/praxis/internal/policy"
 	"github.com/felixgeelhaar/praxis/internal/ports"
 	"github.com/felixgeelhaar/praxis/internal/schema"
@@ -161,6 +162,15 @@ func bootstrap(ctx context.Context) (*runtime, func(), error) {
 	registry := capability.New()
 	configureCompat(registry, cfg)
 	registerHandlers(registry)
+
+	// Phase 5 cgroup v2 detection. Logs the outcome at startup so
+	// operators see the fallback reason without grepping for absent
+	// cgroup metrics. Spawn-into-cgroup wiring lands in t-cgroup-v2-spawn.
+	if cgst := cgroup.Detect(); cgst.Available {
+		logger.Info().Str("root", cgst.Root).Msg("cgroup v2 enforcement available")
+	} else {
+		logger.Info().Str("reason", cgst.Reason).Msg("cgroup v2 unavailable; using setrlimit fallback")
+	}
 
 	m := &metrics{}
 	pluginMgr, err := loadPlugins(ctx, logger, cfg, registry, m)
