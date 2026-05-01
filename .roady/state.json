@@ -315,34 +315,52 @@
       "completed_at": "2026-05-01T10:17:20.595047+00:00"
     },
     "t-handler-github-create-issue": {
-      "status": "pending",
+      "status": "done",
       "path": "",
-      "elapsed_minutes": 0
+      "elapsed_minutes": 90,
+      "owner": "ai-agent",
+      "started_at": "2026-05-01T11:01:33.783200+00:00",
+      "completed_at": "2026-05-01T11:01:33.783200+00:00"
     },
     "t-handler-github-comment": {
-      "status": "pending",
+      "status": "done",
       "path": "",
-      "elapsed_minutes": 0
+      "elapsed_minutes": 90,
+      "owner": "ai-agent",
+      "started_at": "2026-05-01T11:01:33.783200+00:00",
+      "completed_at": "2026-05-01T11:01:33.783200+00:00"
     },
     "t-handler-linear-create-issue": {
-      "status": "pending",
+      "status": "done",
       "path": "",
-      "elapsed_minutes": 0
+      "elapsed_minutes": 90,
+      "owner": "ai-agent",
+      "started_at": "2026-05-01T11:01:33.783200+00:00",
+      "completed_at": "2026-05-01T11:01:33.783200+00:00"
     },
     "t-handler-calendar-schedule": {
-      "status": "pending",
+      "status": "done",
       "path": "",
-      "elapsed_minutes": 0
+      "elapsed_minutes": 90,
+      "owner": "ai-agent",
+      "started_at": "2026-05-01T11:01:33.783200+00:00",
+      "completed_at": "2026-05-01T11:01:33.783200+00:00"
     },
     "t-vendor-retry-after-header": {
-      "status": "pending",
+      "status": "done",
       "path": "",
-      "elapsed_minutes": 0
+      "elapsed_minutes": 90,
+      "owner": "ai-agent",
+      "started_at": "2026-05-01T11:01:33.783200+00:00",
+      "completed_at": "2026-05-01T11:01:33.783200+00:00"
     },
     "t-async-webhook-callback": {
-      "status": "pending",
+      "status": "done",
       "path": "",
-      "elapsed_minutes": 0
+      "elapsed_minutes": 90,
+      "owner": "ai-agent",
+      "started_at": "2026-05-01T11:01:33.783200+00:00",
+      "completed_at": "2026-05-01T11:01:33.783200+00:00"
     },
     "t-plugin-handler-abi": {
       "status": "pending",
