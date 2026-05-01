@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/felixgeelhaar/bolt"
+	"github.com/felixgeelhaar/praxis/internal/domain"
 	"github.com/felixgeelhaar/praxis/internal/handlerrunner"
 )
 
@@ -113,6 +114,33 @@ func TestRun_FailsFastOnNonRetryable(t *testing.T) {
 	_, _ = r.Run(context.Background(), h, nil)
 	if atomic.LoadInt32(&h.calls) != 1 {
 		t.Errorf("calls=%d want 1 (fail-fast)", h.calls)
+	}
+}
+
+func TestRunWithCapability_PerCapMaxAttempts(t *testing.T) {
+	r := newRunner() // global MaxAttempts = 2
+	h := &fakeHandler{name: "h", err: errors.New("503 boom")}
+	capSpec := &domain.Capability{
+		Name: "h",
+		Retry: &domain.RetryConfig{
+			MaxAttempts:  5,
+			InitialDelay: int64(time.Millisecond),
+			MaxDelay:     int64(5 * time.Millisecond),
+			Multiplier:   2,
+		},
+	}
+	_, _ = r.RunWithCapability(context.Background(), capSpec, h, nil)
+	if got := atomic.LoadInt32(&h.calls); got < 5 {
+		t.Errorf("calls=%d want ≥5 (per-cap MaxAttempts overrides global)", got)
+	}
+}
+
+func TestRunWithCapability_NilFallsBackToGlobal(t *testing.T) {
+	r := newRunner() // global MaxAttempts = 2
+	h := &fakeHandler{name: "h", err: errors.New("503 boom")}
+	_, _ = r.RunWithCapability(context.Background(), nil, h, nil)
+	if got := atomic.LoadInt32(&h.calls); got != 2 {
+		t.Errorf("calls=%d want 2 (global)", got)
 	}
 }
 

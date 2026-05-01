@@ -10,6 +10,7 @@ import (
 	"github.com/felixgeelhaar/fortify/circuitbreaker"
 	"github.com/felixgeelhaar/fortify/retry"
 	"github.com/felixgeelhaar/praxis/internal/capability"
+	"github.com/felixgeelhaar/praxis/internal/domain"
 )
 
 var ErrTimeout = errors.New("handler timeout")
@@ -109,7 +110,53 @@ func New(logger *bolt.Logger, cfg Config) *Runner {
 	}
 }
 
+// Run invokes a handler under the runner's global retry strategy and
+// circuit breaker.
 func (r *Runner) Run(ctx context.Context, h capability.Handler, payload map[string]any) (map[string]any, error) {
+	return r.run(ctx, h, payload, r.retryStrat)
+}
+
+// RunWithCapability invokes a handler using a per-capability retry config
+// derived from cap.Retry. Falls back to the global strategy when the
+// capability does not declare one. Phase-2 M2.3.
+func (r *Runner) RunWithCapability(ctx context.Context, cap *domain.Capability, h capability.Handler, payload map[string]any) (map[string]any, error) {
+	strat := r.retryStrat
+	if cap != nil && cap.Retry != nil {
+		strat = retry.New[map[string]any](buildRetryConfig(*cap.Retry))
+	}
+	return r.run(ctx, h, payload, strat)
+}
+
+// buildRetryConfig translates a domain.RetryConfig into a fortify retry.Config
+// using the project-default IsRetryable classifier. InitialDelay/MaxDelay
+// are interpreted as nanoseconds (the field is int64 so a config can be
+// declared as time.Millisecond * N before serialisation).
+func buildRetryConfig(rc domain.RetryConfig) retry.Config {
+	cfg := retry.Config{
+		MaxAttempts:   rc.MaxAttempts,
+		InitialDelay:  time.Duration(rc.InitialDelay),
+		MaxDelay:      time.Duration(rc.MaxDelay),
+		Multiplier:    rc.Multiplier,
+		BackoffPolicy: retry.BackoffExponential,
+		Jitter:        true,
+		IsRetryable:   IsRetryable,
+	}
+	if cfg.MaxAttempts <= 0 {
+		cfg.MaxAttempts = 3
+	}
+	if cfg.InitialDelay <= 0 {
+		cfg.InitialDelay = 100 * time.Millisecond
+	}
+	if cfg.MaxDelay <= 0 {
+		cfg.MaxDelay = 5 * time.Second
+	}
+	if cfg.Multiplier <= 0 {
+		cfg.Multiplier = 2.0
+	}
+	return cfg
+}
+
+func (r *Runner) run(ctx context.Context, h capability.Handler, payload map[string]any, strat retry.Retry[map[string]any]) (map[string]any, error) {
 	execute := func(ctx context.Context) (map[string]any, error) {
 		resultCh := make(chan struct {
 			output map[string]any
@@ -142,7 +189,7 @@ func (r *Runner) Run(ctx context.Context, h capability.Handler, payload map[stri
 	}
 
 	output, err := r.circuitBreaker.Execute(ctx, func(ctx context.Context) (map[string]any, error) {
-		return r.retryStrat.Do(ctx, execute)
+		return strat.Do(ctx, execute)
 	})
 
 	if err != nil {

@@ -134,7 +134,7 @@ func (e *Executor) Execute(ctx context.Context, action domain.Action) (domain.Re
 			Code: "unknown_handler", Message: herr.Error(),
 		})
 	}
-	output, runErr := e.runner.Run(ctx, handler, action.Payload)
+	output, runErr := e.runner.RunWithCapability(ctx, &cap, handler, action.Payload)
 	completedAt := e.now()
 
 	var actionErr *domain.ActionError
