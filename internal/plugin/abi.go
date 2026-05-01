@@ -81,6 +81,12 @@ type Loader interface {
 // per discovered plugin. It validates the ABI version, runs Capabilities,
 // and routes each Registration through the supplied Loader.
 //
+// If the plugin implements BudgetedPlugin, every handler in every
+// Registration is wrapped in a Sandboxed wrapper that enforces the
+// declared ResourceBudget. Plugins that don't opt in load unwrapped —
+// existing untrusted-plugin-rejection happens upstream of Load (manifest
+// validation + signature verification).
+//
 // Returning an error short-circuits load — a partial registration is
 // rolled back by the caller (the runtime must not allow half-loaded
 // plugins).
@@ -91,6 +97,12 @@ func Load(ctx context.Context, p Plugin, loader Loader) error {
 	regs, err := p.Capabilities(ctx)
 	if err != nil {
 		return err
+	}
+	if bp, ok := p.(BudgetedPlugin); ok {
+		budget := bp.Budget()
+		for i := range regs {
+			regs[i].Handler = Sandboxed(regs[i].Handler, budget)
+		}
 	}
 	for _, r := range regs {
 		if err := loader.Register(r); err != nil {

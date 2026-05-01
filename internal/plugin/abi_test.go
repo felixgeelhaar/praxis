@@ -118,3 +118,51 @@ var _ = plugin.Registration{
 	Capability: domain.Capability{},
 	Handler:    capability.Handler(nil),
 }
+
+// budgetedFakePlugin extends fakePlugin with Budget() so Load wraps
+// every Registration in a Sandboxed handler.
+type budgetedFakePlugin struct {
+	fakePlugin
+	budget plugin.ResourceBudget
+}
+
+func (b *budgetedFakePlugin) Budget() plugin.ResourceBudget { return b.budget }
+
+func TestLoad_BudgetedPluginWrapsHandlers(t *testing.T) {
+	bp := &budgetedFakePlugin{
+		fakePlugin: fakePlugin{
+			abi: plugin.ABIVersion,
+			caps: []plugin.Registration{
+				{Capability: domain.Capability{Name: "x"}, Handler: &fakeHandler{name: "x"}},
+			},
+		},
+		budget: plugin.ResourceBudget{AllowedHosts: []string{"api.example.com"}},
+	}
+	loader := &fakeLoader{}
+	if err := plugin.Load(context.Background(), bp, loader); err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if len(loader.registered) != 1 {
+		t.Fatalf("registered=%d", len(loader.registered))
+	}
+	// Handler should be a sandboxed wrapper, not the raw fakeHandler.
+	if _, isRaw := loader.registered[0].Handler.(*fakeHandler); isRaw {
+		t.Error("expected handler to be wrapped by Sandboxed")
+	}
+}
+
+func TestLoad_NonBudgetedPluginPassesHandlersUnwrapped(t *testing.T) {
+	p := &fakePlugin{
+		abi: plugin.ABIVersion,
+		caps: []plugin.Registration{
+			{Capability: domain.Capability{Name: "y"}, Handler: &fakeHandler{name: "y"}},
+		},
+	}
+	loader := &fakeLoader{}
+	if err := plugin.Load(context.Background(), p, loader); err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if _, isRaw := loader.registered[0].Handler.(*fakeHandler); !isRaw {
+		t.Error("expected non-budgeted plugin's handler to remain unwrapped")
+	}
+}
