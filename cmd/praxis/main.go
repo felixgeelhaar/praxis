@@ -29,9 +29,11 @@ import (
 	"github.com/felixgeelhaar/praxis/internal/domain"
 	"github.com/felixgeelhaar/praxis/internal/executor"
 	"github.com/felixgeelhaar/praxis/internal/handlerrunner"
+	calendarhandler "github.com/felixgeelhaar/praxis/internal/handlers/calendar"
 	emailhandler "github.com/felixgeelhaar/praxis/internal/handlers/email"
 	githubhandler "github.com/felixgeelhaar/praxis/internal/handlers/github"
 	httphandler "github.com/felixgeelhaar/praxis/internal/handlers/http"
+	linearhandler "github.com/felixgeelhaar/praxis/internal/handlers/linear"
 	slackhandler "github.com/felixgeelhaar/praxis/internal/handlers/slack"
 	"github.com/felixgeelhaar/praxis/internal/idempotency"
 	"github.com/felixgeelhaar/praxis/internal/jobs"
@@ -163,6 +165,10 @@ func registerHandlers(reg *capability.Registry) {
 	ghCfg := githubhandler.Config{Token: os.Getenv("GITHUB_TOKEN")}
 	_ = reg.Register(githubhandler.NewCreateIssue(ghCfg))
 	_ = reg.Register(githubhandler.NewAddComment(ghCfg))
+	linCfg := linearhandler.Config{Token: os.Getenv("LINEAR_TOKEN")}
+	_ = reg.Register(linearhandler.NewCreateIssue(linCfg))
+	_ = reg.Register(linearhandler.NewTransitionStatus(linCfg))
+	_ = reg.Register(calendarhandler.New(defaultEnv("PRAXIS_PRODUCT_DOMAIN", "praxis.local")))
 }
 
 func defaultEnv(k, def string) string {
