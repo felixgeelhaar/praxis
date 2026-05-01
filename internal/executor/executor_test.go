@@ -18,6 +18,10 @@ import (
 	"github.com/felixgeelhaar/praxis/internal/ports"
 	"github.com/felixgeelhaar/praxis/internal/schema"
 	"github.com/felixgeelhaar/praxis/internal/store/memory"
+	"go.opentelemetry.io/otel"
+	otelcodes "go.opentelemetry.io/otel/codes"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 )
 
 type fakeHandler struct {
@@ -555,5 +559,116 @@ func TestListCapabilitiesForCaller_PassesThroughExecutor(t *testing.T) {
 		if c.Name == "a_priv" {
 			t.Errorf("org-b leaked org-a's private cap")
 		}
+	}
+}
+
+// --- Phase 5: OTel span instrumentation ---
+
+func TestExecute_OpensSpanWithActionAttributes(t *testing.T) {
+	exporter := tracetest.NewInMemoryExporter()
+	tp := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exporter))
+	otel.SetTracerProvider(tp)
+	t.Cleanup(func() { otel.SetTracerProvider(otel.GetTracerProvider()) })
+
+	h := newHarness(t, &fakeHandler{
+		name:   "test_handler",
+		output: map[string]any{"ts": "1.0", "ok": true},
+	})
+	action := newAction("a-trace-1")
+	action.Caller = domain.CallerRef{Type: "user", ID: "u-1", OrgID: "org-x", TeamID: "eng"}
+	if _, err := h.exec.Execute(context.Background(), action); err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+
+	spans := exporter.GetSpans()
+	var execSpan tracetest.SpanStub
+	for _, s := range spans {
+		if s.Name == "executor.Execute" {
+			execSpan = s
+			break
+		}
+	}
+	if execSpan.Name == "" {
+		t.Fatalf("executor.Execute span missing; got=%+v", spans)
+	}
+	attrs := map[string]string{}
+	for _, a := range execSpan.Attributes {
+		attrs[string(a.Key)] = a.Value.AsString()
+	}
+	if attrs["praxis.action.id"] != "a-trace-1" {
+		t.Errorf("action.id=%q", attrs["praxis.action.id"])
+	}
+	if attrs["praxis.capability"] != "test_handler" {
+		t.Errorf("capability=%q", attrs["praxis.capability"])
+	}
+	if attrs["praxis.org.id"] != "org-x" {
+		t.Errorf("org.id=%q", attrs["praxis.org.id"])
+	}
+	if attrs["praxis.team.id"] != "eng" {
+		t.Errorf("team.id=%q", attrs["praxis.team.id"])
+	}
+	if attrs["praxis.outcome"] != "succeeded" {
+		t.Errorf("outcome=%q want succeeded", attrs["praxis.outcome"])
+	}
+}
+
+func TestExecute_HandlerSpanIsChild(t *testing.T) {
+	exporter := tracetest.NewInMemoryExporter()
+	tp := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exporter))
+	otel.SetTracerProvider(tp)
+	t.Cleanup(func() { otel.SetTracerProvider(otel.GetTracerProvider()) })
+
+	h := newHarness(t, &fakeHandler{
+		name:   "test_handler",
+		output: map[string]any{"ts": "1.0"},
+	})
+	if _, err := h.exec.Execute(context.Background(), newAction("a-2")); err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	spans := exporter.GetSpans()
+	var execID, handlerParent string
+	for _, s := range spans {
+		if s.Name == "executor.Execute" {
+			execID = s.SpanContext.SpanID().String()
+		}
+		if s.Name == "handler.test_handler" {
+			handlerParent = s.Parent.SpanID().String()
+		}
+	}
+	if execID == "" || handlerParent == "" {
+		t.Fatalf("missing spans: spans=%+v", spans)
+	}
+	if execID != handlerParent {
+		t.Errorf("handler parent=%s want %s (executor.Execute)", handlerParent, execID)
+	}
+}
+
+func TestExecute_RejectionMarksSpanError(t *testing.T) {
+	exporter := tracetest.NewInMemoryExporter()
+	tp := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exporter))
+	otel.SetTracerProvider(tp)
+	t.Cleanup(func() { otel.SetTracerProvider(otel.GetTracerProvider()) })
+
+	h := newHarness(t, &fakeHandler{name: "test_handler"})
+	bad := newAction("a-3")
+	bad.Capability = "missing_cap"
+	_, _ = h.exec.Execute(context.Background(), bad)
+
+	spans := exporter.GetSpans()
+	var got tracetest.SpanStub
+	for _, s := range spans {
+		if s.Name == "executor.Execute" {
+			got = s
+		}
+	}
+	if got.Status.Code != otelcodes.Error {
+		t.Errorf("status=%v want Error", got.Status.Code)
+	}
+	attrs := map[string]string{}
+	for _, a := range got.Attributes {
+		attrs[string(a.Key)] = a.Value.AsString()
+	}
+	if attrs["praxis.outcome"] != "rejected" {
+		t.Errorf("outcome=%q want rejected", attrs["praxis.outcome"])
 	}
 }

@@ -24,7 +24,18 @@ import (
 	"github.com/felixgeelhaar/praxis/internal/ports"
 	"github.com/felixgeelhaar/praxis/internal/schema"
 	"github.com/felixgeelhaar/praxis/internal/webhook"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 )
+
+// tracerName is the instrumentation-scope name reported on every span
+// the executor opens. Stable across releases — operators build span
+// queries against it.
+const tracerName = "github.com/felixgeelhaar/praxis/internal/executor"
+
+func tracer() trace.Tracer { return otel.Tracer(tracerName) }
 
 // Outcomes accepts a terminal MnemosEvent for asynchronous delivery. The
 // outcome layer (internal/outcome) implements this; it never blocks Execute.
@@ -91,6 +102,10 @@ func (e *Executor) SetClock(now func() time.Time) { e.now = now }
 
 // Execute runs an action through the full TDD §5.2 flow.
 func (e *Executor) Execute(ctx context.Context, action domain.Action) (domain.Result, error) {
+	ctx, span := tracer().Start(ctx, "executor.Execute",
+		trace.WithAttributes(actionAttrs(action)...))
+	defer span.End()
+
 	if action.IdempotencyKey == "" {
 		action.IdempotencyKey = action.ID
 	}
@@ -167,7 +182,13 @@ func (e *Executor) Execute(ctx context.Context, action domain.Action) (domain.Re
 			Code: "unknown_handler", Message: herr.Error(),
 		})
 	}
-	output, runErr := e.runner.RunWithCapability(ctx, &cap, handler, action.Payload)
+	hctx, hspan := tracer().Start(ctx, "handler."+action.Capability,
+		trace.WithAttributes(attribute.String("praxis.capability", action.Capability)))
+	output, runErr := e.runner.RunWithCapability(hctx, &cap, handler, action.Payload)
+	if runErr != nil {
+		hspan.SetStatus(codes.Error, runErr.Error())
+	}
+	hspan.End()
 	completedAt := e.now()
 
 	var actionErr *domain.ActionError
@@ -189,6 +210,10 @@ func (e *Executor) Execute(ctx context.Context, action domain.Action) (domain.Re
 
 // DryRun runs an action through the §5.3 flow without invoking a destination.
 func (e *Executor) DryRun(ctx context.Context, action domain.Action) (domain.Simulation, error) {
+	ctx, span := tracer().Start(ctx, "executor.DryRun",
+		trace.WithAttributes(actionAttrs(action)...))
+	defer span.End()
+
 	if action.IdempotencyKey == "" {
 		action.IdempotencyKey = action.ID
 	}
@@ -275,6 +300,9 @@ var ErrNotReversible = errors.New("capability does not support compensation")
 // Revert is idempotent at the Praxis layer: re-calling it on an already-
 // compensated action returns the cached result.
 func (e *Executor) Revert(ctx context.Context, actionID string) (domain.Result, error) {
+	ctx, span := tracer().Start(ctx, "executor.Revert",
+		trace.WithAttributes(attribute.String("praxis.action.id", actionID)))
+	defer span.End()
 	original, err := e.actions.Get(ctx, actionID)
 	if err != nil {
 		return domain.Result{}, fmt.Errorf("revert: load action %s: %w", actionID, err)
@@ -337,6 +365,9 @@ func (e *Executor) Revert(ctx context.Context, actionID string) (domain.Result, 
 // IdempotencyKeeper layer: a duplicate Resume call will short-circuit on the
 // remembered result.
 func (e *Executor) Resume(ctx context.Context, action domain.Action) (domain.Result, error) {
+	ctx, span := tracer().Start(ctx, "executor.Resume",
+		trace.WithAttributes(actionAttrs(action)...))
+	defer span.End()
 	cap, err := e.registry.GetCapabilityForCaller(action.Capability, action.Caller)
 	if err != nil {
 		return e.reject(ctx, action, "unknown_capability", err.Error())
@@ -409,6 +440,7 @@ func (e *Executor) reject(ctx context.Context, action domain.Action, code, msg s
 	if e.outcomes != nil {
 		_ = e.outcomes.Emit(ctx, e.mnemosEvent(action, res))
 	}
+	recordOutcome(ctx, domain.StatusRejected, action.Error)
 	return res, errors.New(code + ": " + msg)
 }
 
@@ -454,6 +486,7 @@ func (e *Executor) terminateWithTimes(ctx context.Context, action domain.Action,
 			e.logger.Error().Err(werr).Str("action_id", action.ID).Msg("webhook notify failed")
 		}
 	}
+	recordOutcome(ctx, action.Status, ae)
 	if ae != nil {
 		return res, errors.New(ae.Code + ": " + ae.Message)
 	}
@@ -461,6 +494,16 @@ func (e *Executor) terminateWithTimes(ctx context.Context, action domain.Action,
 }
 
 func (e *Executor) appendAudit(ctx context.Context, a domain.Action, kind string, extra map[string]any) {
+	// Mirror every lifecycle audit kind as a span event so distributed
+	// traces show validate/policy/throttled/executed/succeeded/failed
+	// without a separate audit lookup. Cheap when no tracer is set.
+	if span := trace.SpanFromContext(ctx); span.IsRecording() {
+		attrs := []attribute.KeyValue{attribute.String("praxis.status", string(a.Status))}
+		for k, v := range extra {
+			attrs = append(attrs, attribute.String("praxis."+k, fmt.Sprintf("%v", v)))
+		}
+		span.AddEvent("audit."+kind, trace.WithAttributes(attrs...))
+	}
 	if e.auditRepo == nil {
 		return
 	}
@@ -484,6 +527,48 @@ func (e *Executor) appendAudit(ctx context.Context, a domain.Action, kind string
 		CreatedAt: e.now(),
 	}); err != nil {
 		e.logger.Error().Err(err).Str("action_id", a.ID).Str("kind", kind).Msg("audit append failed")
+	}
+}
+
+// actionAttrs builds the per-action attribute set every executor span
+// shares. Stable keys; operators alert on these.
+func actionAttrs(a domain.Action) []attribute.KeyValue {
+	attrs := []attribute.KeyValue{
+		attribute.String("praxis.action.id", a.ID),
+		attribute.String("praxis.capability", a.Capability),
+		attribute.String("praxis.caller.type", a.Caller.Type),
+		attribute.String("praxis.caller.id", a.Caller.ID),
+	}
+	if a.Caller.OrgID != "" {
+		attrs = append(attrs, attribute.String("praxis.org.id", a.Caller.OrgID))
+	}
+	if a.Caller.TeamID != "" {
+		attrs = append(attrs, attribute.String("praxis.team.id", a.Caller.TeamID))
+	}
+	if a.IdempotencyKey != "" && a.IdempotencyKey != a.ID {
+		attrs = append(attrs, attribute.String("praxis.idempotency_key", a.IdempotencyKey))
+	}
+	if a.Mode != "" {
+		attrs = append(attrs, attribute.String("praxis.mode", string(a.Mode)))
+	}
+	return attrs
+}
+
+// recordOutcome stamps the active span with the terminal status so a
+// trace query can filter by outcome without joining audit. Errors set
+// the span status to ERROR; successes leave it Unset (default OK).
+func recordOutcome(ctx context.Context, status domain.ActionStatus, ae *domain.ActionError) {
+	span := trace.SpanFromContext(ctx)
+	if !span.IsRecording() {
+		return
+	}
+	span.SetAttributes(attribute.String("praxis.outcome", string(status)))
+	if ae != nil {
+		span.SetAttributes(
+			attribute.String("praxis.error.code", ae.Code),
+			attribute.Bool("praxis.error.retryable", ae.Retryable),
+		)
+		span.SetStatus(codes.Error, ae.Message)
 	}
 }
 
