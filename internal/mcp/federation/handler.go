@@ -17,12 +17,15 @@ import (
 // Phase 5 federated MCP.
 type federatedHandler struct {
 	conn         *Connection
-	toolName     string
+	toolName     string // upstream's local tool name
+	capName      string // namespaced "<upstream>__<tool>" registry key
 	upstreamName string
 }
 
-// Name implements capability.Handler.
-func (h *federatedHandler) Name() string { return h.toolName }
+// Name implements capability.Handler. Returns the namespaced
+// capability name so the registry's name → handler map stays in
+// lock-step with the registered domain.Capability.Name.
+func (h *federatedHandler) Name() string { return h.capName }
 
 // Execute forwards to the upstream's CallTool. The result envelope
 // from mcp-go is returned as-is in an "output" key so the executor's
@@ -54,14 +57,9 @@ func (h *federatedHandler) Simulate(_ context.Context, _ map[string]any) (map[st
 // Capability implements capability.Describer so the registry's
 // type-assertion picks up the upstream's input schema.
 func (h *federatedHandler) Capability() domain.Capability {
-	// Note: descriptor is built once at Registrations() time and the
-	// handler stores the relevant fields locally; this method is
-	// provided for completeness when callers grab the handler
-	// directly.
 	return domain.Capability{
-		Name:        h.toolName,
+		Name:        h.capName,
 		Description: fmt.Sprintf("Federated tool %s from upstream %s", h.toolName, h.upstreamName),
-		// Simulatable=false: see Simulate godoc.
 		Simulatable: false,
 		Idempotent:  false,
 	}
@@ -92,6 +90,7 @@ func Registrations(conn *Connection) []Registration {
 			Handler: &federatedHandler{
 				conn:         conn,
 				toolName:     toolName,
+				capName:      capName,
 				upstreamName: conn.UpstreamName,
 			},
 		})

@@ -59,6 +59,14 @@ type metrics struct {
 	auditPurge       sync.Map // "{orgID}\x00{result}" -> *atomic.Uint64
 	pluginMemPeak    sync.Map // pluginName -> *atomic.Uint64 (high-water bytes)
 	pluginCPUNs      sync.Map // pluginName -> *atomic.Uint64 (cumulative ns)
+	mcpFedStatus     sync.Map // upstreamName -> *atomic.Value (string "up"|"down")
+}
+
+// recordMCPFederationStatus surfaces an upstream's connection state
+// in /metrics. Phase 5 t-mcp-federation-failure-handling.
+func (m *metrics) recordMCPFederationStatus(upstream, status string) {
+	v, _ := m.mcpFedStatus.LoadOrStore(upstream, &atomic.Value{})
+	v.(*atomic.Value).Store(status)
 }
 
 // recordPluginUsage stores the cgroup-recorded usage figures from the
@@ -130,6 +138,17 @@ func newMux(deps kernelDeps, m *metrics) *http.ServeMux {
 		m.pluginCPUNs.Range(func(k, v any) bool {
 			ns := v.(*atomic.Uint64).Load()
 			fmt.Fprintf(w, "praxis_plugin_cpu_seconds_total{name=%q} %.6f\n", k.(string), float64(ns)/1e9)
+			return true
+		})
+		fmt.Fprintf(w, "# HELP praxis_mcp_federation_status Connection state per federated upstream (up=1, down=0).\n")
+		fmt.Fprintf(w, "# TYPE praxis_mcp_federation_status gauge\n")
+		m.mcpFedStatus.Range(func(k, v any) bool {
+			s, _ := v.(*atomic.Value).Load().(string)
+			val := 0
+			if s == "up" {
+				val = 1
+			}
+			fmt.Fprintf(w, "praxis_mcp_federation_status{upstream=%q,status=%q} %d\n", k.(string), s, val)
 			return true
 		})
 		fmt.Fprintf(w, "# HELP praxis_audit_purge_total Audit events purged by retention sweep.\n")

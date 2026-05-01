@@ -117,6 +117,28 @@ func Connect(ctx context.Context, upstream Upstream) (*Connection, error) {
 	}, nil
 }
 
+// NewConnectionForTest returns a Connection without a real
+// transport. The supervisor + manager tests use this to drive the
+// reconnect / deregister paths without spawning real subprocesses.
+// Production callers must use Connect.
+func NewConnectionForTest(upstreamName string, tools []Tool) *Connection {
+	return &Connection{
+		UpstreamName: upstreamName,
+		Tools:        tools,
+		closed:       make(chan error, 1),
+	}
+}
+
+// TriggerCloseForTest pushes an error onto the connection's Watch
+// channel, simulating a transport failure. Tests use this to drive
+// the supervisor's disconnect path deterministically.
+func TriggerCloseForTest(c *Connection, err error) {
+	select {
+	case c.closed <- err:
+	default:
+	}
+}
+
 func stringSet(s []string) map[string]bool {
 	out := make(map[string]bool, len(s))
 	for _, v := range s {

@@ -39,6 +39,7 @@ import (
 	"github.com/felixgeelhaar/praxis/internal/idempotency"
 	"github.com/felixgeelhaar/praxis/internal/jobs"
 	pmcp "github.com/felixgeelhaar/praxis/internal/mcp"
+	"github.com/felixgeelhaar/praxis/internal/mcp/federation"
 	"github.com/felixgeelhaar/praxis/internal/observability"
 	"github.com/felixgeelhaar/praxis/internal/outcome"
 	"github.com/felixgeelhaar/praxis/internal/plugin"
@@ -366,6 +367,17 @@ func runServe() int {
 
 	jobsRunner := jobs.New(rt.logger, rt.repos.Action, rt.exec, jobs.Config{})
 	go jobsRunner.Run(ctx)
+
+	if rt.cfg.MCPFederationConfigPath != "" {
+		fedCfg, err := federation.LoadConfig(rt.cfg.MCPFederationConfigPath)
+		if err != nil {
+			rt.logger.Error().Err(err).Msg("MCP federation config load failed")
+		} else {
+			fedMgr := federation.NewManager(fedCfg, rt.reg)
+			fedMgr.OnStatus = rt.metrics.recordMCPFederationStatus
+			go fedMgr.Run(ctx)
+		}
+	}
 
 	if rt.pluginManager != nil && rt.cfg.PluginAutoreload {
 		w, werr := plugin.NewWatcher(plugin.WatcherConfig{
