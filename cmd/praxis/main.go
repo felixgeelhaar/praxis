@@ -30,6 +30,7 @@ import (
 	"github.com/felixgeelhaar/praxis/internal/executor"
 	"github.com/felixgeelhaar/praxis/internal/handlerrunner"
 	emailhandler "github.com/felixgeelhaar/praxis/internal/handlers/email"
+	httphandler "github.com/felixgeelhaar/praxis/internal/handlers/http"
 	slackhandler "github.com/felixgeelhaar/praxis/internal/handlers/slack"
 	"github.com/felixgeelhaar/praxis/internal/idempotency"
 	"github.com/felixgeelhaar/praxis/internal/outcome"
@@ -122,6 +123,7 @@ func bootstrap(ctx context.Context) (*runtime, func(), error) {
 	registerHandlers(registry)
 
 	pol := policy.New(logger, repos.Policy)
+	pol.SetMode(policy.Mode(cfg.PolicyMode))
 	idem := idempotency.New(repos.Idempotency)
 	runner := handlerrunner.New(logger, handlerrunner.Config{
 		MaxAttempts:  3,
@@ -151,6 +153,7 @@ func registerHandlers(reg *capability.Registry) {
 		Password: os.Getenv("SMTP_PASSWORD"),
 		From:     os.Getenv("SMTP_FROM"),
 	}))
+	_ = reg.Register(httphandler.New(httphandler.Config{}))
 }
 
 func defaultEnv(k, def string) string {
