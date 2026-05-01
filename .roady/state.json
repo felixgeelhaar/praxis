@@ -454,9 +454,12 @@
       "completed_at": "2026-05-01T13:06:41.574263+00:00"
     },
     "t-org-dashboards": {
-      "status": "pending",
+      "status": "done",
       "path": "",
-      "elapsed_minutes": 0
+      "elapsed_minutes": 75,
+      "owner": "ai-agent",
+      "started_at": "2026-05-01T13:12:21.925111+00:00",
+      "completed_at": "2026-05-01T13:12:21.925111+00:00"
     }
   },
   "updated_at": "2026-04-30T19:38:40.131182+02:00"
