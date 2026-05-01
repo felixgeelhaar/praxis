@@ -1,6 +1,6 @@
 {
   "project_id": "Praxis",
-  "version": 4,
+  "version": 5,
   "task_states": {
     "t-action-fsm": {
       "status": "done",
@@ -233,6 +233,191 @@
       "owner": "ai-agent",
       "started_at": "2026-05-01T08:32:46.253850+00:00",
       "completed_at": "2026-05-01T08:32:46.253850+00:00"
+    },
+    "t-policy-default-deny-mode": {
+      "status": "done",
+      "path": "",
+      "elapsed_minutes": 60,
+      "owner": "ai-agent",
+      "started_at": "2026-05-01T10:17:20.595047+00:00",
+      "completed_at": "2026-05-01T10:17:20.595047+00:00"
+    },
+    "t-policy-priority-ordering": {
+      "status": "done",
+      "path": "",
+      "elapsed_minutes": 60,
+      "owner": "ai-agent",
+      "started_at": "2026-05-01T10:17:20.595047+00:00",
+      "completed_at": "2026-05-01T10:17:20.595047+00:00"
+    },
+    "t-policy-fail-closed-on-repo-error": {
+      "status": "done",
+      "path": "",
+      "elapsed_minutes": 60,
+      "owner": "ai-agent",
+      "started_at": "2026-05-01T10:17:20.595047+00:00",
+      "completed_at": "2026-05-01T10:17:20.595047+00:00"
+    },
+    "t-async-mode-schema-and-port": {
+      "status": "done",
+      "path": "",
+      "elapsed_minutes": 60,
+      "owner": "ai-agent",
+      "started_at": "2026-05-01T10:17:20.595047+00:00",
+      "completed_at": "2026-05-01T10:17:20.595047+00:00"
+    },
+    "t-async-jobs-runner": {
+      "status": "done",
+      "path": "",
+      "elapsed_minutes": 60,
+      "owner": "ai-agent",
+      "started_at": "2026-05-01T10:17:20.595047+00:00",
+      "completed_at": "2026-05-01T10:17:20.595047+00:00"
+    },
+    "t-async-202-response": {
+      "status": "done",
+      "path": "",
+      "elapsed_minutes": 60,
+      "owner": "ai-agent",
+      "started_at": "2026-05-01T10:17:20.595047+00:00",
+      "completed_at": "2026-05-01T10:17:20.595047+00:00"
+    },
+    "t-per-cap-retry-runtime": {
+      "status": "done",
+      "path": "",
+      "elapsed_minutes": 60,
+      "owner": "ai-agent",
+      "started_at": "2026-05-01T10:17:20.595047+00:00",
+      "completed_at": "2026-05-01T10:17:20.595047+00:00"
+    },
+    "t-rate-limiter": {
+      "status": "done",
+      "path": "",
+      "elapsed_minutes": 60,
+      "owner": "ai-agent",
+      "started_at": "2026-05-01T10:17:20.595047+00:00",
+      "completed_at": "2026-05-01T10:17:20.595047+00:00"
+    },
+    "t-policy-throttled-audit-kind": {
+      "status": "done",
+      "path": "",
+      "elapsed_minutes": 60,
+      "owner": "ai-agent",
+      "started_at": "2026-05-01T10:17:20.595047+00:00",
+      "completed_at": "2026-05-01T10:17:20.595047+00:00"
+    },
+    "t-handler-http-request": {
+      "status": "done",
+      "path": "",
+      "elapsed_minutes": 60,
+      "owner": "ai-agent",
+      "started_at": "2026-05-01T10:17:20.595047+00:00",
+      "completed_at": "2026-05-01T10:17:20.595047+00:00"
+    },
+    "t-handler-github-create-issue": {
+      "status": "pending",
+      "path": "",
+      "elapsed_minutes": 0
+    },
+    "t-handler-github-comment": {
+      "status": "pending",
+      "path": "",
+      "elapsed_minutes": 0
+    },
+    "t-handler-linear-create-issue": {
+      "status": "pending",
+      "path": "",
+      "elapsed_minutes": 0
+    },
+    "t-handler-calendar-schedule": {
+      "status": "pending",
+      "path": "",
+      "elapsed_minutes": 0
+    },
+    "t-vendor-retry-after-header": {
+      "status": "pending",
+      "path": "",
+      "elapsed_minutes": 0
+    },
+    "t-async-webhook-callback": {
+      "status": "pending",
+      "path": "",
+      "elapsed_minutes": 0
+    },
+    "t-plugin-handler-abi": {
+      "status": "pending",
+      "path": "",
+      "elapsed_minutes": 0
+    },
+    "t-plugin-on-disk-discovery": {
+      "status": "pending",
+      "path": "",
+      "elapsed_minutes": 0
+    },
+    "t-plugin-signature-verification": {
+      "status": "pending",
+      "path": "",
+      "elapsed_minutes": 0
+    },
+    "t-plugin-resource-sandbox": {
+      "status": "pending",
+      "path": "",
+      "elapsed_minutes": 0
+    },
+    "t-mcp-server-bootstrap": {
+      "status": "pending",
+      "path": "",
+      "elapsed_minutes": 0
+    },
+    "t-mcp-tool-discovery": {
+      "status": "pending",
+      "path": "",
+      "elapsed_minutes": 0
+    },
+    "t-mcp-tool-execute-dryrun": {
+      "status": "pending",
+      "path": "",
+      "elapsed_minutes": 0
+    },
+    "t-tenant-scope-hierarchy": {
+      "status": "pending",
+      "path": "",
+      "elapsed_minutes": 0
+    },
+    "t-tenant-audit-retention": {
+      "status": "pending",
+      "path": "",
+      "elapsed_minutes": 0
+    },
+    "t-tenant-private-capabilities": {
+      "status": "pending",
+      "path": "",
+      "elapsed_minutes": 0
+    },
+    "t-capability-compensate": {
+      "status": "pending",
+      "path": "",
+      "elapsed_minutes": 0
+    },
+    "t-cli-revert-command": {
+      "status": "pending",
+      "path": "",
+      "elapsed_minutes": 0
+    },
+    "t-audit-export-json-csv": {
+      "status": "pending",
+      "path": "",
+      "elapsed_minutes": 0
+    },
+    "t-audit-pii-redaction": {
+      "status": "pending",
+      "path": "",
+      "elapsed_minutes": 0
+    },
+    "t-org-dashboards": {
+      "status": "pending",
+      "path": "",
+      "elapsed_minutes": 0
     }
   },
   "updated_at": "2026-04-30T19:38:40.131182+02:00"
