@@ -138,11 +138,18 @@ func (e *Engine) ListRules(ctx context.Context) ([]domain.PolicyRule, error) {
 //   - empty Capability matches any capability
 //   - empty CallerType matches any caller
 //   - non-empty Scope requires at least one overlap with the action's scope
+//   - empty OrgID / TeamID match any tenant (Phase 3 M3.3)
 func matches(r domain.PolicyRule, a domain.Action) bool {
 	if r.Capability != "" && r.Capability != a.Capability {
 		return false
 	}
 	if r.CallerType != "" && !strings.EqualFold(r.CallerType, a.Caller.Type) {
+		return false
+	}
+	if r.OrgID != "" && r.OrgID != a.Caller.OrgID {
+		return false
+	}
+	if r.TeamID != "" && r.TeamID != a.Caller.TeamID {
 		return false
 	}
 	if len(r.Scope) > 0 {

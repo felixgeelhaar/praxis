@@ -75,6 +75,43 @@ func TestEvaluate_RuleScopedToCallerType(t *testing.T) {
 	}
 }
 
+func TestEvaluate_TenantScopeHierarchy(t *testing.T) {
+	e, _ := newEngine(t)
+	// org-scoped deny
+	_ = e.AddRule(context.Background(), domain.PolicyRule{
+		ID: "deny-org-x", Capability: "send", OrgID: "org-x", Decision: "deny",
+	})
+	if d := e.Evaluate(context.Background(), domain.Action{
+		Capability: "send", Caller: domain.CallerRef{Type: "user", OrgID: "org-other"},
+	}); d.Decision != "allow" {
+		t.Errorf("other org: %s want allow", d.Decision)
+	}
+	if d := e.Evaluate(context.Background(), domain.Action{
+		Capability: "send", Caller: domain.CallerRef{Type: "user", OrgID: "org-x"},
+	}); d.Decision != "deny" {
+		t.Errorf("org-x: %s want deny", d.Decision)
+	}
+}
+
+func TestEvaluate_TeamScopeHierarchy(t *testing.T) {
+	e, _ := newEngine(t)
+	_ = e.AddRule(context.Background(), domain.PolicyRule{
+		ID: "deny-team", Capability: "send", OrgID: "org-x", TeamID: "team-y", Decision: "deny",
+	})
+	// Same org, different team: allow
+	if d := e.Evaluate(context.Background(), domain.Action{
+		Capability: "send", Caller: domain.CallerRef{OrgID: "org-x", TeamID: "team-z"},
+	}); d.Decision != "allow" {
+		t.Errorf("other team: %s want allow", d.Decision)
+	}
+	// Same org + team: deny
+	if d := e.Evaluate(context.Background(), domain.Action{
+		Capability: "send", Caller: domain.CallerRef{OrgID: "org-x", TeamID: "team-y"},
+	}); d.Decision != "deny" {
+		t.Errorf("matching team: %s want deny", d.Decision)
+	}
+}
+
 func TestEvaluate_FirstMatchWins_ByPriority(t *testing.T) {
 	e, _ := newEngine(t)
 	_ = e.AddRule(context.Background(), domain.PolicyRule{ID: "z-allow", Capability: "x", Decision: "allow", Priority: 100})
