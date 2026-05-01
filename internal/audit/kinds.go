@@ -14,4 +14,5 @@ const (
 	KindFailed    = "failed"
 	KindSimulated = "simulated"
 	KindRejected  = "rejected"
+	KindThrottled = "policy_throttled"
 )

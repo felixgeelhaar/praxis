@@ -19,6 +19,7 @@ import (
 	"github.com/felixgeelhaar/praxis/internal/domain"
 	"github.com/felixgeelhaar/praxis/internal/handlerrunner"
 	"github.com/felixgeelhaar/praxis/internal/idempotency"
+	"github.com/felixgeelhaar/praxis/internal/limiter"
 	"github.com/felixgeelhaar/praxis/internal/policy"
 	"github.com/felixgeelhaar/praxis/internal/ports"
 	"github.com/felixgeelhaar/praxis/internal/schema"
@@ -40,6 +41,7 @@ type Executor struct {
 	idempotent *idempotency.Keeper
 	runner     *handlerrunner.Runner
 	validator  *schema.Validator
+	limiter    *limiter.Limiter
 	actions    ports.ActionRepo
 	auditRepo  ports.AuditRepo
 	outcomes   Outcomes
@@ -65,12 +67,17 @@ func New(
 		idempotent: idem,
 		runner:     runner,
 		validator:  validator,
+		limiter:    limiter.New(),
 		actions:    actions,
 		auditRepo:  auditRepo,
 		outcomes:   outcomes,
 		now:        time.Now,
 	}
 }
+
+// SetLimiter swaps in a pre-built Limiter (e.g. one shared across multiple
+// executors or backed by a distributed store).
+func (e *Executor) SetLimiter(l *limiter.Limiter) { e.limiter = l }
 
 // SetClock overrides time.Now — used by tests for deterministic timestamps.
 func (e *Executor) SetClock(now func() time.Time) { e.now = now }
@@ -113,6 +120,13 @@ func (e *Executor) Execute(ctx context.Context, action domain.Action) (domain.Re
 	})
 	if decision.Decision != "allow" {
 		return e.reject(ctx, action, "policy_denied", decision.Reason)
+	}
+
+	if allowed, retryAfter := e.limiter.Allow(ctx, cap, action); !allowed {
+		e.appendAudit(ctx, action, audit.KindThrottled, map[string]any{
+			"retry_after_ms": retryAfter.Milliseconds(),
+		})
+		return e.reject(ctx, action, "rate_limited", "rate limit exceeded; retry after "+retryAfter.String())
 	}
 
 	if existing, err := e.idempotent.Check(ctx, action.IdempotencyKey); err == nil && existing != nil {

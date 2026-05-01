@@ -252,6 +252,65 @@ func TestExecute_PolicyDeny(t *testing.T) {
 	}
 }
 
+func TestExecute_RateLimited(t *testing.T) {
+	logger := bolt.New(bolt.NewJSONHandler(io.Discard))
+	mem := memory.New()
+
+	handler := &fakeHandler{name: "throttled", output: map[string]any{"ok": true}}
+
+	// Wrap a handler whose Capability descriptor declares a tiny rate limit.
+	rlHandler := &rateLimitedHandler{fakeHandler: handler}
+
+	registry := capability.New()
+	_ = registry.Register(rlHandler)
+	pol := policy.New(logger, mem.Policy)
+	idem := idempotency.New(mem.Idempotency)
+	runner := handlerrunner.New(logger, handlerrunner.Config{MaxAttempts: 1})
+	outcomes := &capturingOutcomes{}
+
+	exec := executor.New(logger, registry, pol, idem, runner, schema.New(),
+		mem.Action, mem.Audit, outcomes)
+
+	a := newAction("rl-1")
+	a.Capability = "throttled"
+
+	if _, err := exec.Execute(context.Background(), a); err != nil {
+		t.Fatalf("first Execute: %v", err)
+	}
+	a2 := newAction("rl-2")
+	a2.Capability = "throttled"
+	a2.Caller = a.Caller // same caller key
+	if _, err := exec.Execute(context.Background(), a2); err == nil {
+		t.Fatal("expected rate_limited error on second call")
+	}
+
+	events, _ := mem.Audit.ListForAction(context.Background(), "rl-2")
+	var kinds []string
+	for _, e := range events {
+		kinds = append(kinds, e.Kind)
+	}
+	if !contains(kinds, audit.KindThrottled) {
+		t.Errorf("missing %s in %v", audit.KindThrottled, kinds)
+	}
+	if !contains(kinds, audit.KindRejected) {
+		t.Errorf("missing rejected in %v", kinds)
+	}
+	if handler.callCount != 1 {
+		t.Errorf("handler invoked %d times, want 1 (second call should be throttled)", handler.callCount)
+	}
+}
+
+type rateLimitedHandler struct{ *fakeHandler }
+
+func (h *rateLimitedHandler) Capability() domain.Capability {
+	return domain.Capability{
+		Name:        "throttled",
+		Simulatable: true,
+		Idempotent:  true,
+		RateLimit:   &domain.RateLimitConfig{Rate: 1, Burst: 1, Interval: int64(time.Second)},
+	}
+}
+
 func TestDryRun_Simulatable(t *testing.T) {
 	h := newHarness(t, &fakeHandler{
 		name:     "test_handler",
