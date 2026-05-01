@@ -12,14 +12,19 @@
 //   - execute            → maps to Executor.Execute.
 //   - dry_run            → maps to Executor.DryRun.
 //
-// A future iteration (separate roady task) will register one MCP tool per
-// capability so the schema is exposed natively per tool. The universal-
-// tool design here is the smallest change that wires the protocol end to
-// end and is enough for agent-go consumption today.
+// Per-capability tool registration is layered on top of the universal
+// tools: at boot, Register iterates Executor.ListCapabilities and adds
+// one MCP tool per capability whose name is the capability name. The
+// per-cap tool's description embeds the capability's JSON Schema so MCP
+// clients (e.g. agent-go agents) see one tool per Praxis capability —
+// idiomatic from the agent's perspective — while still flowing through
+// the same executor pipeline (policy, schema, idempotency, audit).
 package mcp
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 
 	"github.com/felixgeelhaar/mcp-go"
 
@@ -132,7 +137,99 @@ func Register(info Info, exec Executor, idGen func() string) *mcp.Server {
 			}, nil
 		})
 
+	registerPerCapability(srv, exec, idGen)
 	return srv
+}
+
+// CapInput is the per-capability tool input. Each capability's MCP tool
+// shape is `{"payload": {...cap-specific JSON Schema...}, "idempotency_key"?,
+// "mode"?, "scope"?}`. The cap-specific schema is conveyed via the tool's
+// description because mcp-go derives the wire schema from this struct's
+// reflection — a dynamic per-call schema is not yet supported by mcp-go.
+type CapInput struct {
+	Payload        map[string]any `json:"payload,omitempty"`
+	IdempotencyKey string         `json:"idempotency_key,omitempty"`
+	Mode           string         `json:"mode,omitempty"`
+	CallerType     string         `json:"caller_type,omitempty"`
+	CallerID       string         `json:"caller_id,omitempty"`
+	Scope          []string       `json:"scope,omitempty"`
+}
+
+// registerPerCapability adds one MCP tool per Praxis capability. Failures
+// to enumerate are non-fatal — the universal `execute` and `dry_run` tools
+// already give clients a working surface.
+func registerPerCapability(srv *mcp.Server, exec Executor, idGen func() string) {
+	caps, err := exec.ListCapabilities(context.Background())
+	if err != nil || len(caps) == 0 {
+		return
+	}
+	for _, c := range caps {
+		c := c // closure capture
+		desc := buildCapDescription(c)
+		srv.Tool(c.Name).
+			Description(desc).
+			Handler(func(ctx context.Context, in CapInput) (ExecuteOutput, error) {
+				a := actionFromCapInput(c.Name, in, idGen)
+				res, eerr := exec.Execute(ctx, a)
+				out := ExecuteOutput{
+					ActionID:   res.ActionID,
+					Status:     string(res.Status),
+					Output:     res.Output,
+					ExternalID: res.ExternalID,
+				}
+				if res.Error != nil {
+					out.ErrorCode = res.Error.Code
+					out.ErrorMsg = res.Error.Message
+				} else if eerr != nil {
+					out.ErrorCode = "execute_error"
+					out.ErrorMsg = eerr.Error()
+				}
+				return out, nil
+			})
+	}
+}
+
+// buildCapDescription embeds the capability's JSON Schema and metadata in
+// the tool description so MCP clients can render and validate the payload
+// shape locally.
+func buildCapDescription(c domain.Capability) string {
+	desc := c.Description
+	if desc == "" {
+		desc = c.Name
+	}
+	if c.InputSchema != nil {
+		if b, err := json.MarshalIndent(c.InputSchema, "", "  "); err == nil {
+			desc += "\n\n## Input Payload Schema\n\n```json\n" + string(b) + "\n```"
+		}
+	}
+	if len(c.Permissions) > 0 {
+		desc += fmt.Sprintf("\n\n**Permissions required:** %v", c.Permissions)
+	}
+	if c.Simulatable {
+		desc += "\n\nSupports dry_run."
+	}
+	if c.Idempotent {
+		desc += " Idempotent at destination."
+	}
+	return desc
+}
+
+func actionFromCapInput(capName string, in CapInput, idGen func() string) domain.Action {
+	id := idGen()
+	mode := domain.ActionMode(in.Mode)
+	if mode == "" {
+		mode = domain.ModeSync
+	}
+	return domain.Action{
+		ID:             id,
+		Capability:     capName,
+		Payload:        in.Payload,
+		Caller:         domain.CallerRef{Type: firstNonEmpty(in.CallerType, "mcp"), ID: in.CallerID},
+		Scope:          in.Scope,
+		IdempotencyKey: firstNonEmpty(in.IdempotencyKey, id),
+		Mode:           mode,
+		Status:         domain.StatusPending,
+	}
 }
 
 // ServeStdio is the Phase-1 transport binding: stdio MCP, the canonical

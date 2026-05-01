@@ -104,3 +104,23 @@ func TestRegister_AcceptsErrExec(t *testing.T) {
 		t.Fatal("nil server")
 	}
 }
+
+func TestRegister_RegistersOneToolPerCapability(t *testing.T) {
+	exec, _ := newExec(t)
+	srv := pmcp.Register(pmcp.Info{Name: "praxis", Version: "v"}, exec, func() string { return "act" })
+
+	// Universal tools.
+	for _, want := range []string{"list_capabilities", "execute", "dry_run"} {
+		if _, ok := srv.GetTool(want); !ok {
+			t.Errorf("universal tool %s missing", want)
+		}
+	}
+	// Per-cap tool — newExec wires a single "stub" capability.
+	tool, ok := srv.GetTool("stub")
+	if !ok {
+		t.Fatal("per-capability tool 'stub' not registered")
+	}
+	if tool == nil {
+		t.Fatal("nil tool")
+	}
+}
