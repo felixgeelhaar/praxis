@@ -41,14 +41,16 @@ type AuditEvent struct {
 }
 
 type Capability struct {
-	Name         string         `json:"name"`
-	Description  sql.NullString `json:"description"`
-	InputSchema  string         `json:"input_schema"`
-	OutputSchema string         `json:"output_schema"`
-	Permissions  string         `json:"permissions"`
-	Simulatable  int64          `json:"simulatable"`
-	Idempotent   int64          `json:"idempotent"`
-	RegisteredAt string         `json:"registered_at"`
+	Name                string         `json:"name"`
+	Description         sql.NullString `json:"description"`
+	InputSchema         string         `json:"input_schema"`
+	OutputSchema        string         `json:"output_schema"`
+	Permissions         string         `json:"permissions"`
+	Simulatable         int64          `json:"simulatable"`
+	Idempotent          int64          `json:"idempotent"`
+	RegisteredAt        string         `json:"registered_at"`
+	InputSchemaVersion  string         `json:"input_schema_version"`
+	OutputSchemaVersion string         `json:"output_schema_version"`
 }
 
 type IdempotencyKey struct {

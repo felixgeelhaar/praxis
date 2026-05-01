@@ -159,6 +159,7 @@ func bootstrap(ctx context.Context) (*runtime, func(), error) {
 	}
 
 	registry := capability.New()
+	configureCompat(registry, cfg)
 	registerHandlers(registry)
 
 	m := &metrics{}
@@ -211,6 +212,33 @@ func runSighupReload(ctx context.Context, rt *runtime) {
 			}
 		}
 	}
+}
+
+// configureCompat wires the schema compat checker into the registry
+// per PRAXIS_SCHEMA_COMPAT. Off skips installation entirely so the
+// registry runs the pre-Phase-5 path; warn fires the metric+log
+// callback but accepts; strict refuses incompatible registrations.
+func configureCompat(reg *capability.Registry, cfg config.Config) {
+	mode := capability.CompatMode(cfg.SchemaCompat)
+	switch mode {
+	case capability.CompatStrict, capability.CompatWarn:
+	default:
+		return
+	}
+	reg.SetCompatMode(mode,
+		func(prev, next domain.Capability) []capability.CompatIssue {
+			out := []capability.CompatIssue{}
+			for _, i := range schema.CheckCompat(prev, next) {
+				out = append(out, capability.CompatIssue{
+					Code:    i.Code,
+					Field:   i.Field,
+					Message: i.Message,
+				})
+			}
+			return out
+		},
+		nil,
+	)
 }
 
 // pluginRegistryLoader bridges the in-process *capability.Registry into

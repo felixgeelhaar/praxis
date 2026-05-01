@@ -1,21 +1,23 @@
 -- name: UpsertCapability :exec
-INSERT INTO capabilities (name, description, input_schema, output_schema, permissions, simulatable, idempotent, registered_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+INSERT INTO capabilities (name, description, input_schema, input_schema_version, output_schema, output_schema_version, permissions, simulatable, idempotent, registered_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 ON CONFLICT(name) DO UPDATE SET
-    description   = EXCLUDED.description,
-    input_schema  = EXCLUDED.input_schema,
-    output_schema = EXCLUDED.output_schema,
-    permissions   = EXCLUDED.permissions,
-    simulatable   = EXCLUDED.simulatable,
-    idempotent    = EXCLUDED.idempotent,
-    registered_at = EXCLUDED.registered_at;
+    description           = EXCLUDED.description,
+    input_schema          = EXCLUDED.input_schema,
+    input_schema_version  = EXCLUDED.input_schema_version,
+    output_schema         = EXCLUDED.output_schema,
+    output_schema_version = EXCLUDED.output_schema_version,
+    permissions           = EXCLUDED.permissions,
+    simulatable           = EXCLUDED.simulatable,
+    idempotent            = EXCLUDED.idempotent,
+    registered_at         = EXCLUDED.registered_at;
 
 -- name: GetCapability :one
-SELECT name, description, input_schema, output_schema, permissions, simulatable, idempotent, registered_at
+SELECT name, description, input_schema, input_schema_version, output_schema, output_schema_version, permissions, simulatable, idempotent, registered_at
 FROM capabilities WHERE name = $1;
 
 -- name: ListCapabilities :many
-SELECT name, description, input_schema, output_schema, permissions, simulatable, idempotent, registered_at
+SELECT name, description, input_schema, input_schema_version, output_schema, output_schema_version, permissions, simulatable, idempotent, registered_at
 FROM capabilities
 ORDER BY name;
 

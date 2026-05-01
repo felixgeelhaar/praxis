@@ -141,18 +141,33 @@ func (q *Queries) GetAction(ctx context.Context, id string) (GetActionRow, error
 }
 
 const getCapability = `-- name: GetCapability :one
-SELECT name, description, input_schema, output_schema, permissions, simulatable, idempotent, registered_at
+SELECT name, description, input_schema, input_schema_version, output_schema, output_schema_version, permissions, simulatable, idempotent, registered_at
 FROM capabilities WHERE name = ?
 `
 
-func (q *Queries) GetCapability(ctx context.Context, name string) (Capability, error) {
+type GetCapabilityRow struct {
+	Name                string         `json:"name"`
+	Description         sql.NullString `json:"description"`
+	InputSchema         string         `json:"input_schema"`
+	InputSchemaVersion  string         `json:"input_schema_version"`
+	OutputSchema        string         `json:"output_schema"`
+	OutputSchemaVersion string         `json:"output_schema_version"`
+	Permissions         string         `json:"permissions"`
+	Simulatable         int64          `json:"simulatable"`
+	Idempotent          int64          `json:"idempotent"`
+	RegisteredAt        string         `json:"registered_at"`
+}
+
+func (q *Queries) GetCapability(ctx context.Context, name string) (GetCapabilityRow, error) {
 	row := q.db.QueryRowContext(ctx, getCapability, name)
-	var i Capability
+	var i GetCapabilityRow
 	err := row.Scan(
 		&i.Name,
 		&i.Description,
 		&i.InputSchema,
+		&i.InputSchemaVersion,
 		&i.OutputSchema,
+		&i.OutputSchemaVersion,
 		&i.Permissions,
 		&i.Simulatable,
 		&i.Idempotent,
@@ -280,25 +295,40 @@ func (q *Queries) ListAuditForAction(ctx context.Context, actionID string) ([]Li
 }
 
 const listCapabilities = `-- name: ListCapabilities :many
-SELECT name, description, input_schema, output_schema, permissions, simulatable, idempotent, registered_at
+SELECT name, description, input_schema, input_schema_version, output_schema, output_schema_version, permissions, simulatable, idempotent, registered_at
 FROM capabilities
 ORDER BY name
 `
 
-func (q *Queries) ListCapabilities(ctx context.Context) ([]Capability, error) {
+type ListCapabilitiesRow struct {
+	Name                string         `json:"name"`
+	Description         sql.NullString `json:"description"`
+	InputSchema         string         `json:"input_schema"`
+	InputSchemaVersion  string         `json:"input_schema_version"`
+	OutputSchema        string         `json:"output_schema"`
+	OutputSchemaVersion string         `json:"output_schema_version"`
+	Permissions         string         `json:"permissions"`
+	Simulatable         int64          `json:"simulatable"`
+	Idempotent          int64          `json:"idempotent"`
+	RegisteredAt        string         `json:"registered_at"`
+}
+
+func (q *Queries) ListCapabilities(ctx context.Context) ([]ListCapabilitiesRow, error) {
 	rows, err := q.db.QueryContext(ctx, listCapabilities)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Capability
+	var items []ListCapabilitiesRow
 	for rows.Next() {
-		var i Capability
+		var i ListCapabilitiesRow
 		if err := rows.Scan(
 			&i.Name,
 			&i.Description,
 			&i.InputSchema,
+			&i.InputSchemaVersion,
 			&i.OutputSchema,
+			&i.OutputSchemaVersion,
 			&i.Permissions,
 			&i.Simulatable,
 			&i.Idempotent,
@@ -723,27 +753,31 @@ func (q *Queries) UpsertAction(ctx context.Context, arg UpsertActionParams) erro
 }
 
 const upsertCapability = `-- name: UpsertCapability :exec
-INSERT INTO capabilities (name, description, input_schema, output_schema, permissions, simulatable, idempotent, registered_at)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+INSERT INTO capabilities (name, description, input_schema, input_schema_version, output_schema, output_schema_version, permissions, simulatable, idempotent, registered_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT(name) DO UPDATE SET
-    description   = excluded.description,
-    input_schema  = excluded.input_schema,
-    output_schema = excluded.output_schema,
-    permissions   = excluded.permissions,
-    simulatable   = excluded.simulatable,
-    idempotent    = excluded.idempotent,
-    registered_at = excluded.registered_at
+    description           = excluded.description,
+    input_schema          = excluded.input_schema,
+    input_schema_version  = excluded.input_schema_version,
+    output_schema         = excluded.output_schema,
+    output_schema_version = excluded.output_schema_version,
+    permissions           = excluded.permissions,
+    simulatable           = excluded.simulatable,
+    idempotent            = excluded.idempotent,
+    registered_at         = excluded.registered_at
 `
 
 type UpsertCapabilityParams struct {
-	Name         string         `json:"name"`
-	Description  sql.NullString `json:"description"`
-	InputSchema  string         `json:"input_schema"`
-	OutputSchema string         `json:"output_schema"`
-	Permissions  string         `json:"permissions"`
-	Simulatable  int64          `json:"simulatable"`
-	Idempotent   int64          `json:"idempotent"`
-	RegisteredAt string         `json:"registered_at"`
+	Name                string         `json:"name"`
+	Description         sql.NullString `json:"description"`
+	InputSchema         string         `json:"input_schema"`
+	InputSchemaVersion  string         `json:"input_schema_version"`
+	OutputSchema        string         `json:"output_schema"`
+	OutputSchemaVersion string         `json:"output_schema_version"`
+	Permissions         string         `json:"permissions"`
+	Simulatable         int64          `json:"simulatable"`
+	Idempotent          int64          `json:"idempotent"`
+	RegisteredAt        string         `json:"registered_at"`
 }
 
 func (q *Queries) UpsertCapability(ctx context.Context, arg UpsertCapabilityParams) error {
@@ -751,7 +785,9 @@ func (q *Queries) UpsertCapability(ctx context.Context, arg UpsertCapabilityPara
 		arg.Name,
 		arg.Description,
 		arg.InputSchema,
+		arg.InputSchemaVersion,
 		arg.OutputSchema,
+		arg.OutputSchemaVersion,
 		arg.Permissions,
 		arg.Simulatable,
 		arg.Idempotent,

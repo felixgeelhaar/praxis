@@ -14,10 +14,10 @@ type Querier interface {
 	DeletePolicyRule(ctx context.Context, id string) error
 	EnqueueOutcome(ctx context.Context, arg EnqueueOutcomeParams) error
 	GetAction(ctx context.Context, id string) (GetActionRow, error)
-	GetCapability(ctx context.Context, name string) (Capability, error)
+	GetCapability(ctx context.Context, name string) (GetCapabilityRow, error)
 	ListActionsPaged(ctx context.Context, limit int32) ([]ListActionsPagedRow, error)
 	ListAuditForAction(ctx context.Context, actionID string) ([]ListAuditForActionRow, error)
-	ListCapabilities(ctx context.Context) ([]Capability, error)
+	ListCapabilities(ctx context.Context) ([]ListCapabilitiesRow, error)
 	ListPendingAsync(ctx context.Context, limit int32) ([]ListPendingAsyncRow, error)
 	ListPolicyRules(ctx context.Context) ([]PolicyRule, error)
 	LookupIdempotency(ctx context.Context, key string) (IdempotencyKey, error)

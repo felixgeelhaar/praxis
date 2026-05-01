@@ -3,6 +3,7 @@ package capability
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 
 	"github.com/felixgeelhaar/praxis/internal/domain"
@@ -11,6 +12,34 @@ import (
 var (
 	ErrUnknownCapability = errors.New("unknown capability")
 	ErrEmptyOrgID        = errors.New("orgID required for tenant registration")
+	// ErrIncompatibleSchema is returned by Register when the new
+	// capability introduces a breaking change against the previous
+	// version and the registry is configured in strict compat mode.
+	// Phase 5 schema versioning.
+	ErrIncompatibleSchema = errors.New("capability schema introduces breaking change")
+)
+
+// CompatChecker compares previous and new capability snapshots and
+// returns a list of breaking changes. The internal/schema package
+// supplies the production implementation; tests can inject a stub.
+type CompatChecker func(prev, next domain.Capability) []CompatIssue
+
+// CompatIssue is the structural shape of a breaking change. Mirrors
+// schema.Issue without importing the schema package, so the registry
+// stays decoupled from the checker implementation.
+type CompatIssue struct {
+	Code    string
+	Field   string
+	Message string
+}
+
+// CompatMode mirrors schema.CompatMode at the registry boundary.
+type CompatMode string
+
+const (
+	CompatOff    CompatMode = "off"
+	CompatWarn   CompatMode = "warn"
+	CompatStrict CompatMode = "strict"
 )
 
 type Handler interface {
@@ -58,6 +87,10 @@ type Registry struct {
 
 	tenantHandlers     map[string]map[string]Handler
 	tenantCapabilities map[string]map[string]domain.Capability
+
+	compatMode    CompatMode
+	compatChecker CompatChecker
+	onBreak       func(capName string, issues []CompatIssue)
 }
 
 func New() *Registry {
@@ -66,15 +99,43 @@ func New() *Registry {
 		capabilities:       make(map[string]domain.Capability),
 		tenantHandlers:     make(map[string]map[string]Handler),
 		tenantCapabilities: make(map[string]map[string]domain.Capability),
+		compatMode:         CompatOff,
 	}
+}
+
+// SetCompatMode configures the schema compatibility check applied at
+// Register time. When mode is CompatOff the checker is skipped. When
+// CompatStrict, Register returns ErrIncompatibleSchema if the new
+// capability introduces a breaking change against the previous
+// registration. CompatWarn invokes onBreak (if set) but allows the
+// registration to succeed. Phase 5 schema versioning.
+func (r *Registry) SetCompatMode(mode CompatMode, checker CompatChecker, onBreak func(string, []CompatIssue)) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.compatMode = mode
+	r.compatChecker = checker
+	r.onBreak = onBreak
 }
 
 // Register adds a handler to the global registry, visible to every caller.
 func (r *Registry) Register(h Handler) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	desc := describe(h)
+	if r.compatMode != CompatOff && r.compatChecker != nil {
+		if prev, ok := r.capabilities[h.Name()]; ok {
+			if issues := r.compatChecker(prev, desc); len(issues) > 0 {
+				if r.onBreak != nil {
+					r.onBreak(h.Name(), issues)
+				}
+				if r.compatMode == CompatStrict {
+					return fmt.Errorf("%w: %s introduces %d issue(s)", ErrIncompatibleSchema, h.Name(), len(issues))
+				}
+			}
+		}
+	}
 	r.handlers[h.Name()] = h
-	r.capabilities[h.Name()] = describe(h)
+	r.capabilities[h.Name()] = desc
 	return nil
 }
 

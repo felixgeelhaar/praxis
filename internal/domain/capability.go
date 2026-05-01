@@ -2,16 +2,24 @@ package domain
 
 // Capability is a named, schema'd, permissioned unit of side effect.
 // It is a contract — not the handler that runs it.
+//
+// InputSchemaVersion / OutputSchemaVersion are semver strings (e.g.
+// "1", "1.2", "2.0.0"). The compatibility checker (Phase 5) uses them
+// to decide whether a re-registration breaks existing callers; missing
+// values are treated as "1" so legacy capabilities behave as if every
+// reload is a v1 upgrade until the operator opts in to versioning.
 type Capability struct {
-	Name         string
-	Description  string
-	InputSchema  any
-	OutputSchema any
-	Permissions  []string
-	Simulatable  bool
-	Idempotent   bool
-	Retry        *RetryConfig
-	RateLimit    *RateLimitConfig
+	Name                string
+	Description         string
+	InputSchema         any
+	InputSchemaVersion  string
+	OutputSchema        any
+	OutputSchemaVersion string
+	Permissions         []string
+	Simulatable         bool
+	Idempotent          bool
+	Retry               *RetryConfig
+	RateLimit           *RateLimitConfig
 }
 
 type RetryConfig struct {

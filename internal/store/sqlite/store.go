@@ -176,15 +176,27 @@ type capabilityAdapter struct{ q *sqlcgen.Queries }
 
 func (a *capabilityAdapter) Upsert(ctx context.Context, c domain.Capability) error {
 	return a.q.UpsertCapability(ctx, sqlcgen.UpsertCapabilityParams{
-		Name:         c.Name,
-		Description:  nullStr(c.Description),
-		InputSchema:  mustJSON(c.InputSchema),
-		OutputSchema: mustJSON(c.OutputSchema),
-		Permissions:  mustJSON(c.Permissions),
-		Simulatable:  boolToInt(c.Simulatable),
-		Idempotent:   boolToInt(c.Idempotent),
-		RegisteredAt: formatTS(time.Now()),
+		Name:                c.Name,
+		Description:         nullStr(c.Description),
+		InputSchema:         mustJSON(c.InputSchema),
+		InputSchemaVersion:  defaultStr(c.InputSchemaVersion, "1"),
+		OutputSchema:        mustJSON(c.OutputSchema),
+		OutputSchemaVersion: defaultStr(c.OutputSchemaVersion, "1"),
+		Permissions:         mustJSON(c.Permissions),
+		Simulatable:         boolToInt(c.Simulatable),
+		Idempotent:          boolToInt(c.Idempotent),
+		RegisteredAt:        formatTS(time.Now()),
 	})
+}
+
+// defaultStr returns s when non-empty, otherwise def. Used for the
+// schema-version columns where the SQL default is '1' but Go zero
+// values come through as the empty string.
+func defaultStr(s, def string) string {
+	if s == "" {
+		return def
+	}
+	return s
 }
 
 func (a *capabilityAdapter) Get(ctx context.Context, name string) (domain.Capability, error) {
@@ -195,7 +207,17 @@ func (a *capabilityAdapter) Get(ctx context.Context, name string) (domain.Capabi
 	if err != nil {
 		return domain.Capability{}, err
 	}
-	return capabilityFromRow(row), nil
+	return domain.Capability{
+		Name:                row.Name,
+		Description:         valStr(row.Description),
+		InputSchema:         parseJSONMap(row.InputSchema),
+		InputSchemaVersion:  row.InputSchemaVersion,
+		OutputSchema:        parseJSONMap(row.OutputSchema),
+		OutputSchemaVersion: row.OutputSchemaVersion,
+		Permissions:         parseJSONStrings(row.Permissions),
+		Simulatable:         row.Simulatable != 0,
+		Idempotent:          row.Idempotent != 0,
+	}, nil
 }
 
 func (a *capabilityAdapter) List(ctx context.Context) ([]domain.Capability, error) {
@@ -205,21 +227,19 @@ func (a *capabilityAdapter) List(ctx context.Context) ([]domain.Capability, erro
 	}
 	out := make([]domain.Capability, 0, len(rows))
 	for _, r := range rows {
-		out = append(out, capabilityFromRow(r))
+		out = append(out, domain.Capability{
+			Name:                r.Name,
+			Description:         valStr(r.Description),
+			InputSchema:         parseJSONMap(r.InputSchema),
+			InputSchemaVersion:  r.InputSchemaVersion,
+			OutputSchema:        parseJSONMap(r.OutputSchema),
+			OutputSchemaVersion: r.OutputSchemaVersion,
+			Permissions:         parseJSONStrings(r.Permissions),
+			Simulatable:         r.Simulatable != 0,
+			Idempotent:          r.Idempotent != 0,
+		})
 	}
 	return out, nil
-}
-
-func capabilityFromRow(r sqlcgen.Capability) domain.Capability {
-	return domain.Capability{
-		Name:         r.Name,
-		Description:  valStr(r.Description),
-		InputSchema:  parseJSONMap(r.InputSchema),
-		OutputSchema: parseJSONMap(r.OutputSchema),
-		Permissions:  parseJSONStrings(r.Permissions),
-		Simulatable:  r.Simulatable != 0,
-		Idempotent:   r.Idempotent != 0,
-	}
 }
 
 func boolToInt(b bool) int64 {

@@ -203,6 +203,58 @@ func TestListCapabilitiesForCaller_FiltersByCaller(t *testing.T) {
 	}
 }
 
+// Phase 5 schema-compat checker.
+
+func TestRegistry_CompatStrict_RejectsBreakingChange(t *testing.T) {
+	reg := capability.New()
+	checkCalls := 0
+	reg.SetCompatMode(capability.CompatStrict,
+		func(prev, next domain.Capability) []capability.CompatIssue {
+			checkCalls++
+			if prev.Name == next.Name && checkCalls > 0 {
+				return []capability.CompatIssue{{Code: "x", Field: "y", Message: "broke"}}
+			}
+			return nil
+		},
+		nil,
+	)
+	if err := reg.Register(&mockHandler{name: "v1"}); err != nil {
+		t.Fatalf("first Register: %v", err)
+	}
+	err := reg.Register(&mockHandler{name: "v1"})
+	if err == nil {
+		t.Fatal("strict re-registration must fail")
+	}
+}
+
+func TestRegistry_CompatWarn_AllowsButFiresHook(t *testing.T) {
+	reg := capability.New()
+	var got []capability.CompatIssue
+	reg.SetCompatMode(capability.CompatWarn,
+		func(_ domain.Capability, _ domain.Capability) []capability.CompatIssue {
+			return []capability.CompatIssue{{Code: "x", Field: "y", Message: "warn"}}
+		},
+		func(_ string, issues []capability.CompatIssue) { got = issues },
+	)
+	_ = reg.Register(&mockHandler{name: "h"})
+	if err := reg.Register(&mockHandler{name: "h"}); err != nil {
+		t.Errorf("warn mode must not fail: %v", err)
+	}
+	if len(got) != 1 {
+		t.Errorf("hook not fired: %+v", got)
+	}
+}
+
+func TestRegistry_CompatOff_NeverChecks(t *testing.T) {
+	reg := capability.New()
+	checked := false
+	// Default mode is off; SetCompatMode never called.
+	_ = reg.Register(&mockHandler{name: "h"})
+	if checked {
+		t.Error("default off mode should not invoke checker")
+	}
+}
+
 func TestRegistry_ConcurrentRegistrationSafe(t *testing.T) {
 	reg := capability.New()
 	const N = 50

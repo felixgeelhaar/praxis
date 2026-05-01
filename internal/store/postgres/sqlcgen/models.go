@@ -41,14 +41,16 @@ type AuditEvent struct {
 }
 
 type Capability struct {
-	Name         string             `json:"name"`
-	Description  pgtype.Text        `json:"description"`
-	InputSchema  []byte             `json:"input_schema"`
-	OutputSchema []byte             `json:"output_schema"`
-	Permissions  []string           `json:"permissions"`
-	Simulatable  bool               `json:"simulatable"`
-	Idempotent   bool               `json:"idempotent"`
-	RegisteredAt pgtype.Timestamptz `json:"registered_at"`
+	Name                string             `json:"name"`
+	Description         pgtype.Text        `json:"description"`
+	InputSchema         []byte             `json:"input_schema"`
+	OutputSchema        []byte             `json:"output_schema"`
+	Permissions         []string           `json:"permissions"`
+	Simulatable         bool               `json:"simulatable"`
+	Idempotent          bool               `json:"idempotent"`
+	RegisteredAt        pgtype.Timestamptz `json:"registered_at"`
+	InputSchemaVersion  string             `json:"input_schema_version"`
+	OutputSchemaVersion string             `json:"output_schema_version"`
 }
 
 type IdempotencyKey struct {

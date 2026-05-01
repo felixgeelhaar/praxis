@@ -142,18 +142,33 @@ func (q *Queries) GetAction(ctx context.Context, id string) (GetActionRow, error
 }
 
 const getCapability = `-- name: GetCapability :one
-SELECT name, description, input_schema, output_schema, permissions, simulatable, idempotent, registered_at
+SELECT name, description, input_schema, input_schema_version, output_schema, output_schema_version, permissions, simulatable, idempotent, registered_at
 FROM capabilities WHERE name = $1
 `
 
-func (q *Queries) GetCapability(ctx context.Context, name string) (Capability, error) {
+type GetCapabilityRow struct {
+	Name                string             `json:"name"`
+	Description         pgtype.Text        `json:"description"`
+	InputSchema         []byte             `json:"input_schema"`
+	InputSchemaVersion  string             `json:"input_schema_version"`
+	OutputSchema        []byte             `json:"output_schema"`
+	OutputSchemaVersion string             `json:"output_schema_version"`
+	Permissions         []string           `json:"permissions"`
+	Simulatable         bool               `json:"simulatable"`
+	Idempotent          bool               `json:"idempotent"`
+	RegisteredAt        pgtype.Timestamptz `json:"registered_at"`
+}
+
+func (q *Queries) GetCapability(ctx context.Context, name string) (GetCapabilityRow, error) {
 	row := q.db.QueryRow(ctx, getCapability, name)
-	var i Capability
+	var i GetCapabilityRow
 	err := row.Scan(
 		&i.Name,
 		&i.Description,
 		&i.InputSchema,
+		&i.InputSchemaVersion,
 		&i.OutputSchema,
+		&i.OutputSchemaVersion,
 		&i.Permissions,
 		&i.Simulatable,
 		&i.Idempotent,
@@ -275,25 +290,40 @@ func (q *Queries) ListAuditForAction(ctx context.Context, actionID string) ([]Li
 }
 
 const listCapabilities = `-- name: ListCapabilities :many
-SELECT name, description, input_schema, output_schema, permissions, simulatable, idempotent, registered_at
+SELECT name, description, input_schema, input_schema_version, output_schema, output_schema_version, permissions, simulatable, idempotent, registered_at
 FROM capabilities
 ORDER BY name
 `
 
-func (q *Queries) ListCapabilities(ctx context.Context) ([]Capability, error) {
+type ListCapabilitiesRow struct {
+	Name                string             `json:"name"`
+	Description         pgtype.Text        `json:"description"`
+	InputSchema         []byte             `json:"input_schema"`
+	InputSchemaVersion  string             `json:"input_schema_version"`
+	OutputSchema        []byte             `json:"output_schema"`
+	OutputSchemaVersion string             `json:"output_schema_version"`
+	Permissions         []string           `json:"permissions"`
+	Simulatable         bool               `json:"simulatable"`
+	Idempotent          bool               `json:"idempotent"`
+	RegisteredAt        pgtype.Timestamptz `json:"registered_at"`
+}
+
+func (q *Queries) ListCapabilities(ctx context.Context) ([]ListCapabilitiesRow, error) {
 	rows, err := q.db.Query(ctx, listCapabilities)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Capability
+	var items []ListCapabilitiesRow
 	for rows.Next() {
-		var i Capability
+		var i ListCapabilitiesRow
 		if err := rows.Scan(
 			&i.Name,
 			&i.Description,
 			&i.InputSchema,
+			&i.InputSchemaVersion,
 			&i.OutputSchema,
+			&i.OutputSchemaVersion,
 			&i.Permissions,
 			&i.Simulatable,
 			&i.Idempotent,
@@ -703,27 +733,31 @@ func (q *Queries) UpsertAction(ctx context.Context, arg UpsertActionParams) erro
 }
 
 const upsertCapability = `-- name: UpsertCapability :exec
-INSERT INTO capabilities (name, description, input_schema, output_schema, permissions, simulatable, idempotent, registered_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+INSERT INTO capabilities (name, description, input_schema, input_schema_version, output_schema, output_schema_version, permissions, simulatable, idempotent, registered_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 ON CONFLICT(name) DO UPDATE SET
-    description   = EXCLUDED.description,
-    input_schema  = EXCLUDED.input_schema,
-    output_schema = EXCLUDED.output_schema,
-    permissions   = EXCLUDED.permissions,
-    simulatable   = EXCLUDED.simulatable,
-    idempotent    = EXCLUDED.idempotent,
-    registered_at = EXCLUDED.registered_at
+    description           = EXCLUDED.description,
+    input_schema          = EXCLUDED.input_schema,
+    input_schema_version  = EXCLUDED.input_schema_version,
+    output_schema         = EXCLUDED.output_schema,
+    output_schema_version = EXCLUDED.output_schema_version,
+    permissions           = EXCLUDED.permissions,
+    simulatable           = EXCLUDED.simulatable,
+    idempotent            = EXCLUDED.idempotent,
+    registered_at         = EXCLUDED.registered_at
 `
 
 type UpsertCapabilityParams struct {
-	Name         string             `json:"name"`
-	Description  pgtype.Text        `json:"description"`
-	InputSchema  []byte             `json:"input_schema"`
-	OutputSchema []byte             `json:"output_schema"`
-	Permissions  []string           `json:"permissions"`
-	Simulatable  bool               `json:"simulatable"`
-	Idempotent   bool               `json:"idempotent"`
-	RegisteredAt pgtype.Timestamptz `json:"registered_at"`
+	Name                string             `json:"name"`
+	Description         pgtype.Text        `json:"description"`
+	InputSchema         []byte             `json:"input_schema"`
+	InputSchemaVersion  string             `json:"input_schema_version"`
+	OutputSchema        []byte             `json:"output_schema"`
+	OutputSchemaVersion string             `json:"output_schema_version"`
+	Permissions         []string           `json:"permissions"`
+	Simulatable         bool               `json:"simulatable"`
+	Idempotent          bool               `json:"idempotent"`
+	RegisteredAt        pgtype.Timestamptz `json:"registered_at"`
 }
 
 func (q *Queries) UpsertCapability(ctx context.Context, arg UpsertCapabilityParams) error {
@@ -731,7 +765,9 @@ func (q *Queries) UpsertCapability(ctx context.Context, arg UpsertCapabilityPara
 		arg.Name,
 		arg.Description,
 		arg.InputSchema,
+		arg.InputSchemaVersion,
 		arg.OutputSchema,
+		arg.OutputSchemaVersion,
 		arg.Permissions,
 		arg.Simulatable,
 		arg.Idempotent,

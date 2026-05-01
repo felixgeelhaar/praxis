@@ -161,15 +161,25 @@ type capabilityAdapter struct{ q *sqlcgen.Queries }
 
 func (a *capabilityAdapter) Upsert(ctx context.Context, c domain.Capability) error {
 	return a.q.UpsertCapability(ctx, sqlcgen.UpsertCapabilityParams{
-		Name:         c.Name,
-		Description:  textNull(c.Description),
-		InputSchema:  mustJSONBytes(c.InputSchema),
-		OutputSchema: mustJSONBytes(c.OutputSchema),
-		Permissions:  c.Permissions,
-		Simulatable:  c.Simulatable,
-		Idempotent:   c.Idempotent,
-		RegisteredAt: ts(time.Now()),
+		Name:                c.Name,
+		Description:         textNull(c.Description),
+		InputSchema:         mustJSONBytes(c.InputSchema),
+		InputSchemaVersion:  defaultStr(c.InputSchemaVersion, "1"),
+		OutputSchema:        mustJSONBytes(c.OutputSchema),
+		OutputSchemaVersion: defaultStr(c.OutputSchemaVersion, "1"),
+		Permissions:         c.Permissions,
+		Simulatable:         c.Simulatable,
+		Idempotent:          c.Idempotent,
+		RegisteredAt:        ts(time.Now()),
 	})
+}
+
+// defaultStr mirrors the sqlite adapter's helper.
+func defaultStr(s, def string) string {
+	if s == "" {
+		return def
+	}
+	return s
 }
 
 func (a *capabilityAdapter) Get(ctx context.Context, name string) (domain.Capability, error) {
@@ -180,7 +190,17 @@ func (a *capabilityAdapter) Get(ctx context.Context, name string) (domain.Capabi
 	if err != nil {
 		return domain.Capability{}, err
 	}
-	return capabilityFromRow(row), nil
+	return domain.Capability{
+		Name:                row.Name,
+		Description:         textVal(row.Description),
+		InputSchema:         parseJSONMap(row.InputSchema),
+		InputSchemaVersion:  row.InputSchemaVersion,
+		OutputSchema:        parseJSONMap(row.OutputSchema),
+		OutputSchemaVersion: row.OutputSchemaVersion,
+		Permissions:         row.Permissions,
+		Simulatable:         row.Simulatable,
+		Idempotent:          row.Idempotent,
+	}, nil
 }
 
 func (a *capabilityAdapter) List(ctx context.Context) ([]domain.Capability, error) {
@@ -190,21 +210,19 @@ func (a *capabilityAdapter) List(ctx context.Context) ([]domain.Capability, erro
 	}
 	out := make([]domain.Capability, 0, len(rows))
 	for _, r := range rows {
-		out = append(out, capabilityFromRow(r))
+		out = append(out, domain.Capability{
+			Name:                r.Name,
+			Description:         textVal(r.Description),
+			InputSchema:         parseJSONMap(r.InputSchema),
+			InputSchemaVersion:  r.InputSchemaVersion,
+			OutputSchema:        parseJSONMap(r.OutputSchema),
+			OutputSchemaVersion: r.OutputSchemaVersion,
+			Permissions:         r.Permissions,
+			Simulatable:         r.Simulatable,
+			Idempotent:          r.Idempotent,
+		})
 	}
 	return out, nil
-}
-
-func capabilityFromRow(r sqlcgen.Capability) domain.Capability {
-	return domain.Capability{
-		Name:         r.Name,
-		Description:  textVal(r.Description),
-		InputSchema:  parseJSONMap(r.InputSchema),
-		OutputSchema: parseJSONMap(r.OutputSchema),
-		Permissions:  r.Permissions,
-		Simulatable:  r.Simulatable,
-		Idempotent:   r.Idempotent,
-	}
 }
 
 // --- action adapter ---
