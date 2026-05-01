@@ -33,6 +33,7 @@ type Config struct {
 	OTLPInsecure               bool          // PRAXIS_OTLP_INSECURE; default false (TLS)
 	TraceSample                float64       // PRAXIS_TRACE_SAMPLE; 0..1 sampling probability, default 1.0
 	SchemaCompat               string        // PRAXIS_SCHEMA_COMPAT; off (default) | warn | strict
+	MCPFederationConfigPath    string        // PRAXIS_MCP_FEDERATION_CONFIG; empty disables federation
 	AuditRetentionInterval     time.Duration // PRAXIS_AUDIT_RETENTION_INTERVAL; cadence between sweeps
 	AuditRetentionInitialDelay time.Duration // PRAXIS_AUDIT_RETENTION_INITIAL_DELAY; defer first sweep
 	// AuditRetention maps OrgID to retention window. The empty key is the
@@ -71,6 +72,7 @@ func Load() (Config, error) {
 		OTLPInsecure:               parseBool(os.Getenv("PRAXIS_OTLP_INSECURE")),
 		TraceSample:                getFloat("PRAXIS_TRACE_SAMPLE", 1.0),
 		SchemaCompat:               strings.ToLower(getEnv("PRAXIS_SCHEMA_COMPAT", "off")),
+		MCPFederationConfigPath:    os.Getenv("PRAXIS_MCP_FEDERATION_CONFIG"),
 	}
 
 	switch c.DBType {
