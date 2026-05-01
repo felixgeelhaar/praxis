@@ -12,19 +12,20 @@ import (
 
 // Config aggregates all settings consumed by cmd/praxis.
 type Config struct {
-	HTTPHost        string
-	HTTPPort        int
-	APIToken        string
-	DBType          string
-	DBConn          string
-	MnemosURL       string
-	MnemosToken     string
-	HandlerTimeout  time.Duration
-	IdempotencyTTL  time.Duration
-	PolicyMode      string // allow | deny | rules
-	OutboxBatchSize int
-	OutboxPollEvery time.Duration
-	PluginDir       string // PRAXIS_PLUGIN_DIR; empty disables plugin discovery
+	HTTPHost          string
+	HTTPPort          int
+	APIToken          string
+	DBType            string
+	DBConn            string
+	MnemosURL         string
+	MnemosToken       string
+	HandlerTimeout    time.Duration
+	IdempotencyTTL    time.Duration
+	PolicyMode        string // allow | deny | rules
+	OutboxBatchSize   int
+	OutboxPollEvery   time.Duration
+	PluginDir         string   // PRAXIS_PLUGIN_DIR; empty disables plugin discovery
+	PluginTrustedKeys []string // PRAXIS_PLUGIN_TRUSTED_KEYS; PEM ECDSA public keys for cosign-blob verification
 	// AuditRetention maps OrgID to retention window. The empty key is the
 	// default applied to events whose OrgID is unset. Configured via
 	// PRAXIS_AUDIT_RETENTION as a comma-separated list of "orgID=duration"
@@ -37,20 +38,21 @@ type Config struct {
 // returns an error for malformed values.
 func Load() (Config, error) {
 	c := Config{
-		HTTPHost:        getEnv("PRAXIS_HTTP_HOST", "0.0.0.0"),
-		HTTPPort:        getInt("PRAXIS_HTTP_PORT", 8080),
-		APIToken:        os.Getenv("PRAXIS_API_TOKEN"),
-		DBType:          strings.ToLower(getEnv("PRAXIS_DB_TYPE", "memory")),
-		DBConn:          os.Getenv("PRAXIS_DB_CONN"),
-		MnemosURL:       os.Getenv("PRAXIS_MNEMOS_URL"),
-		MnemosToken:     os.Getenv("PRAXIS_MNEMOS_TOKEN"),
-		HandlerTimeout:  getDur("PRAXIS_HANDLER_TIMEOUT", 30*time.Second),
-		IdempotencyTTL:  getDur("PRAXIS_IDEMPOTENCY_TTL", 24*time.Hour),
-		PolicyMode:      strings.ToLower(getEnv("PRAXIS_POLICY_MODE", "allow")),
-		OutboxBatchSize: getInt("PRAXIS_OUTBOX_BATCH_SIZE", 32),
-		OutboxPollEvery: getDur("PRAXIS_OUTBOX_POLL_EVERY", 2*time.Second),
-		PluginDir:       os.Getenv("PRAXIS_PLUGIN_DIR"),
-		AuditRetention:  parseRetention(os.Getenv("PRAXIS_AUDIT_RETENTION")),
+		HTTPHost:          getEnv("PRAXIS_HTTP_HOST", "0.0.0.0"),
+		HTTPPort:          getInt("PRAXIS_HTTP_PORT", 8080),
+		APIToken:          os.Getenv("PRAXIS_API_TOKEN"),
+		DBType:            strings.ToLower(getEnv("PRAXIS_DB_TYPE", "memory")),
+		DBConn:            os.Getenv("PRAXIS_DB_CONN"),
+		MnemosURL:         os.Getenv("PRAXIS_MNEMOS_URL"),
+		MnemosToken:       os.Getenv("PRAXIS_MNEMOS_TOKEN"),
+		HandlerTimeout:    getDur("PRAXIS_HANDLER_TIMEOUT", 30*time.Second),
+		IdempotencyTTL:    getDur("PRAXIS_IDEMPOTENCY_TTL", 24*time.Hour),
+		PolicyMode:        strings.ToLower(getEnv("PRAXIS_POLICY_MODE", "allow")),
+		OutboxBatchSize:   getInt("PRAXIS_OUTBOX_BATCH_SIZE", 32),
+		OutboxPollEvery:   getDur("PRAXIS_OUTBOX_POLL_EVERY", 2*time.Second),
+		PluginDir:         os.Getenv("PRAXIS_PLUGIN_DIR"),
+		PluginTrustedKeys: parseList(os.Getenv("PRAXIS_PLUGIN_TRUSTED_KEYS")),
+		AuditRetention:    parseRetention(os.Getenv("PRAXIS_AUDIT_RETENTION")),
 	}
 
 	switch c.DBType {
@@ -100,6 +102,27 @@ func getDur(key string, def time.Duration) time.Duration {
 		return def
 	}
 	return d
+}
+
+// parseList splits a comma-separated env var into trimmed non-empty
+// entries. Used by list-typed settings (PRAXIS_PLUGIN_TRUSTED_KEYS,
+// future allow-lists). Returns nil for an empty input so callers can
+// distinguish "unset" from "explicitly empty list".
+func parseList(raw string) []string {
+	if strings.TrimSpace(raw) == "" {
+		return nil
+	}
+	parts := strings.Split(raw, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if v := strings.TrimSpace(p); v != "" {
+			out = append(out, v)
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }
 
 // parseRetention parses PRAXIS_AUDIT_RETENTION. Format is a comma-separated

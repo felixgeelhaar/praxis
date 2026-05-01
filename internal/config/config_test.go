@@ -97,6 +97,30 @@ func TestLoad_AuditRetention_DropsMalformed(t *testing.T) {
 	}
 }
 
+func TestLoad_PluginTrustedKeys_DefaultsNil(t *testing.T) {
+	t.Setenv("PRAXIS_PLUGIN_TRUSTED_KEYS", "")
+	c, err := config.Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if c.PluginTrustedKeys != nil {
+		t.Errorf("PluginTrustedKeys=%v want nil", c.PluginTrustedKeys)
+	}
+}
+
+func TestLoad_PluginTrustedKeys_ParsesList(t *testing.T) {
+	t.Setenv("PRAXIS_PLUGIN_TRUSTED_KEYS", "/etc/praxis/k1.pub, /etc/praxis/k2.pub")
+	c, err := config.Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if len(c.PluginTrustedKeys) != 2 ||
+		c.PluginTrustedKeys[0] != "/etc/praxis/k1.pub" ||
+		c.PluginTrustedKeys[1] != "/etc/praxis/k2.pub" {
+		t.Errorf("PluginTrustedKeys=%v", c.PluginTrustedKeys)
+	}
+}
+
 func TestLoad_PluginDirOverride(t *testing.T) {
 	t.Setenv("PRAXIS_PLUGIN_DIR", "/opt/praxis/plugins")
 	c, err := config.Load()
