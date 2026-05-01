@@ -50,14 +50,14 @@ func New(logger *bolt.Logger, client *http.Client) *Notifier {
 
 // Payload is the request body delivered to the callback URL.
 type Payload struct {
-	Type       string         `json:"type"`
-	ActionID   string         `json:"action_id"`
-	Capability string         `json:"capability"`
-	Status     string         `json:"status"`
-	Output     map[string]any `json:"output,omitempty"`
-	ExternalID string         `json:"external_id,omitempty"`
-	Error      *errorPayload  `json:"error,omitempty"`
-	CompletedAt time.Time     `json:"completed_at"`
+	Type        string         `json:"type"`
+	ActionID    string         `json:"action_id"`
+	Capability  string         `json:"capability"`
+	Status      string         `json:"status"`
+	Output      map[string]any `json:"output,omitempty"`
+	ExternalID  string         `json:"external_id,omitempty"`
+	Error       *errorPayload  `json:"error,omitempty"`
+	CompletedAt time.Time      `json:"completed_at"`
 }
 
 type errorPayload struct {

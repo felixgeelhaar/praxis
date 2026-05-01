@@ -114,9 +114,9 @@ func (h *CreateIssue) Execute(ctx context.Context, payload map[string]any) (map[
 		return nil, fmt.Errorf("github decode: %w", err)
 	}
 	return map[string]any{
-		"ok":       true,
-		"number":   out.Number,
-		"url":      out.HTMLURL,
+		"ok":          true,
+		"number":      out.Number,
+		"url":         out.HTMLURL,
 		"external_id": fmt.Sprintf("%d", out.ID),
 	}, nil
 }
