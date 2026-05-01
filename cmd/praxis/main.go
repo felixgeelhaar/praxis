@@ -87,8 +87,10 @@ func printUsage() {
 Usage:
   praxis serve                       Start HTTP API
   praxis mcp                         Start stdio MCP server
-  praxis caps list                   List registered capabilities
-  praxis caps show <name>            Show one capability
+  praxis caps list [--org=<id>] [--team=<id>]
+                                     List capabilities (caller-scoped when --org set)
+  praxis caps show <name> [--org=<id>] [--team=<id>]
+                                     Show one capability
   praxis run <cap> <json> [--dry-run] Execute or simulate a capability
   praxis revert <action-id>          Run the compensating action for a succeeded action
   praxis log show <action-id>        Show audit lifecycle for an action
@@ -340,7 +342,7 @@ func runMCP() int {
 
 func runCaps(args []string) int {
 	if len(args) == 0 {
-		fmt.Fprintln(os.Stderr, "usage: praxis caps [list|show <name>]")
+		fmt.Fprintln(os.Stderr, "usage: praxis caps [list|show <name>] [--org=<id>] [--team=<id>]")
 		return 2
 	}
 	ctx := context.Background()
@@ -351,9 +353,15 @@ func runCaps(args []string) int {
 	}
 	defer cleanup()
 
-	switch args[0] {
+	positional, caller := parseCallerFlags(args)
+	if len(positional) == 0 {
+		fmt.Fprintln(os.Stderr, "usage: praxis caps [list|show <name>] [--org=<id>] [--team=<id>]")
+		return 2
+	}
+
+	switch positional[0] {
 	case "list":
-		caps, err := rt.exec.ListCapabilities(ctx)
+		caps, err := rt.exec.ListCapabilitiesForCaller(ctx, caller)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			return 1
@@ -362,21 +370,48 @@ func runCaps(args []string) int {
 			fmt.Println(c.Name)
 		}
 	case "show":
-		if len(args) < 2 {
-			fmt.Fprintln(os.Stderr, "usage: praxis caps show <name>")
+		if len(positional) < 2 {
+			fmt.Fprintln(os.Stderr, "usage: praxis caps show <name> [--org=<id>] [--team=<id>]")
 			return 2
 		}
-		c, err := rt.reg.GetCapability(args[1])
+		c, err := rt.reg.GetCapabilityForCaller(positional[1], caller)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			return 1
 		}
 		printJSON(c)
 	default:
-		fmt.Fprintln(os.Stderr, "unknown caps subcommand:", args[0])
+		fmt.Fprintln(os.Stderr, "unknown caps subcommand:", positional[0])
 		return 2
 	}
 	return 0
+}
+
+// parseCallerFlags extracts --org and --team flags from the argument
+// stream and returns the positional remainder. Supports both
+// `--org=<id>` and `--org <id>` forms; unknown flags pass through as
+// positional so the caller can decide whether to reject them.
+func parseCallerFlags(args []string) ([]string, domain.CallerRef) {
+	var caller domain.CallerRef
+	out := make([]string, 0, len(args))
+	for i := 0; i < len(args); i++ {
+		a := args[i]
+		switch {
+		case strings.HasPrefix(a, "--org="):
+			caller.OrgID = strings.TrimPrefix(a, "--org=")
+		case a == "--org" && i+1 < len(args):
+			caller.OrgID = args[i+1]
+			i++
+		case strings.HasPrefix(a, "--team="):
+			caller.TeamID = strings.TrimPrefix(a, "--team=")
+		case a == "--team" && i+1 < len(args):
+			caller.TeamID = args[i+1]
+			i++
+		default:
+			out = append(out, a)
+		}
+	}
+	return out, caller
 }
 
 func runAction(args []string) int {
