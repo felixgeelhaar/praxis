@@ -57,6 +57,22 @@ type metrics struct {
 	requestCount     atomic.Uint64
 	pluginLoad       sync.Map // result string -> *atomic.Uint64
 	auditPurge       sync.Map // "{orgID}\x00{result}" -> *atomic.Uint64
+	pluginMemPeak    sync.Map // pluginName -> *atomic.Uint64 (high-water bytes)
+	pluginCPUNs      sync.Map // pluginName -> *atomic.Uint64 (cumulative ns)
+}
+
+// recordPluginUsage stores the cgroup-recorded usage figures from the
+// last reload. Called from ProcessOpener.OnUsageReport via the
+// bootstrap wiring. Phase 5 t-cgroup-v2-usage-metrics.
+func (m *metrics) recordPluginUsage(pluginName string, peakBytes, cpuNs uint64) {
+	if peakBytes > 0 {
+		v, _ := m.pluginMemPeak.LoadOrStore(pluginName, &atomic.Uint64{})
+		v.(*atomic.Uint64).Store(peakBytes)
+	}
+	if cpuNs > 0 {
+		v, _ := m.pluginCPUNs.LoadOrStore(pluginName, &atomic.Uint64{})
+		v.(*atomic.Uint64).Store(cpuNs)
+	}
 }
 
 // incPluginLoad bumps the result-labelled plugin-load counter. Safe to
@@ -101,6 +117,19 @@ func newMux(deps kernelDeps, m *metrics) *http.ServeMux {
 		fmt.Fprintf(w, "# TYPE praxis_plugin_load_total counter\n")
 		m.pluginLoad.Range(func(k, v any) bool {
 			fmt.Fprintf(w, "praxis_plugin_load_total{result=%q} %d\n", k.(string), v.(*atomic.Uint64).Load())
+			return true
+		})
+		fmt.Fprintf(w, "# HELP praxis_plugin_memory_peak_bytes Last reload's cgroup-recorded peak memory per plugin.\n")
+		fmt.Fprintf(w, "# TYPE praxis_plugin_memory_peak_bytes gauge\n")
+		m.pluginMemPeak.Range(func(k, v any) bool {
+			fmt.Fprintf(w, "praxis_plugin_memory_peak_bytes{name=%q} %d\n", k.(string), v.(*atomic.Uint64).Load())
+			return true
+		})
+		fmt.Fprintf(w, "# HELP praxis_plugin_cpu_seconds_total Cumulative CPU seconds consumed since last reload, per plugin.\n")
+		fmt.Fprintf(w, "# TYPE praxis_plugin_cpu_seconds_total counter\n")
+		m.pluginCPUNs.Range(func(k, v any) bool {
+			ns := v.(*atomic.Uint64).Load()
+			fmt.Fprintf(w, "praxis_plugin_cpu_seconds_total{name=%q} %.6f\n", k.(string), float64(ns)/1e9)
 			return true
 		})
 		fmt.Fprintf(w, "# HELP praxis_audit_purge_total Audit events purged by retention sweep.\n")

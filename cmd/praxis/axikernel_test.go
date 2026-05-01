@@ -116,6 +116,43 @@ func TestPlugins_ReloadReturns503WhenManagerNil(t *testing.T) {
 	}
 }
 
+func TestMetrics_PluginUsageGauges(t *testing.T) {
+	logger := bolt.New(bolt.NewJSONHandler(io.Discard))
+	repos := memory.New()
+	reg := capability.New()
+	pol := policy.New(logger, repos.Policy)
+	idem := idempotency.New(repos.Idempotency)
+	runner := handlerrunner.New(logger, handlerrunner.Config{MaxAttempts: 1})
+	emitter := outcome.New(logger, repos.Outbox, outcome.Config{})
+	exec := executor.New(logger, reg, pol, idem, runner, schema.New(),
+		repos.Action, repos.Audit, emitter)
+	auditSvc := audit.New(repos.Audit)
+	m := &metrics{}
+	m.recordPluginUsage("pagerduty", 100<<20, 5_000_000_000)
+	m.recordPluginUsage("slack", 50<<20, 2_500_000_000)
+
+	mux := newMux(kernelDeps{
+		logger: logger, exec: exec, registry: reg, repos: repos,
+		auditSvc: auditSvc, emitter: emitter,
+	}, m)
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	resp, err := http.Get(srv.URL + "/metrics")
+	if err != nil {
+		t.Fatalf("GET: %v", err)
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	out := string(body)
+	if !strings.Contains(out, `praxis_plugin_memory_peak_bytes{name="pagerduty"} 104857600`) {
+		t.Errorf("missing pagerduty memory gauge: %s", out)
+	}
+	if !strings.Contains(out, `praxis_plugin_cpu_seconds_total{name="slack"} 2.500000`) {
+		t.Errorf("missing slack cpu counter: %s", out)
+	}
+}
+
 func TestMetrics_AuditPurgeCounter(t *testing.T) {
 	logger := bolt.New(bolt.NewJSONHandler(io.Discard))
 	repos := memory.New()

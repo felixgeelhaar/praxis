@@ -69,9 +69,18 @@ type ProcessOpener struct {
 	// declared budget. Empty falls back to the setrlimit-only path.
 	CgroupParent string
 
+	// OnUsageReport, when set, receives the cgroup-recorded high-water
+	// memory peak and cumulative CPU time for the plugin just before
+	// the cgroup is reclaimed on Close. Bootstrap wires this to the
+	// praxis_plugin_memory_peak_bytes / praxis_plugin_cpu_seconds_total
+	// metrics. Phase 5 t-cgroup-v2-usage-metrics.
+	OnUsageReport func(pluginName string, peakBytes uint64, cpuNs uint64)
+
 	// SpawnFn is the test seam: production uses exec.Command, tests
 	// supply a custom transport pair without touching the OS.
 	SpawnFn func(ctx context.Context, artefactPath string) (io.WriteCloser, io.ReadCloser, func() error, error)
+
+	cgroupHandles sync.Map // artefactPath -> *cgroup.Handle (production cgroup spawn path)
 }
 
 // Open spawns a child host for artefactPath and returns a Plugin that
@@ -89,6 +98,7 @@ func (o *ProcessOpener) Open(artefactPath string) (Plugin, error) {
 		codec:    codec,
 		kill:     kill,
 		artefact: artefactPath,
+		opener:   o,
 	}
 	if err := p.handshake(); err != nil {
 		_ = p.Close()
@@ -147,6 +157,7 @@ func (o *ProcessOpener) spawn(ctx context.Context, artefactPath string) (io.Writ
 	}
 	if cgHandle != nil && cmd.Process != nil {
 		_ = cgHandle.AddPID(cmd.Process.Pid)
+		o.cgroupHandles.Store(artefactPath, cgHandle)
 	}
 
 	kill := func() error {
@@ -157,10 +168,30 @@ func (o *ProcessOpener) spawn(ctx context.Context, artefactPath string) (io.Writ
 		err := cmd.Wait()
 		if cgHandle != nil {
 			_ = cgHandle.Cleanup()
+			o.cgroupHandles.Delete(artefactPath)
 		}
 		return err
 	}
 	return stdin, stdout, kill, nil
+}
+
+// reportUsage reads the cgroup's recorded peak memory and CPU usage
+// and forwards them to OnUsageReport. Called from processPlugin.Close
+// BEFORE the kill closure runs, since Cleanup deletes the cgroup
+// directory. Silent no-op when the opener has no callback or no
+// cgroup handle for this artefact.
+func (o *ProcessOpener) reportUsage(artefactPath, pluginName string) {
+	if o == nil || o.OnUsageReport == nil {
+		return
+	}
+	v, ok := o.cgroupHandles.Load(artefactPath)
+	if !ok {
+		return
+	}
+	h := v.(*cgroup.Handle)
+	peak, _ := h.ReadMemoryPeak()
+	cpuNs, _ := h.ReadCPUUsageNs()
+	o.OnUsageReport(pluginName, peak, cpuNs)
 }
 
 // processPlugin proxies the Plugin interface over a Codec to a child
@@ -171,6 +202,7 @@ type processPlugin struct {
 	codec    *ipc.Codec
 	kill     func() error
 	artefact string
+	opener   *ProcessOpener // nil in tests that bypass the opener
 
 	manifest Manifest
 
@@ -323,6 +355,11 @@ func (p *processPlugin) Capabilities(_ context.Context) ([]Registration, error) 
 func (p *processPlugin) Close() error {
 	var err error
 	p.once.Do(func() {
+		// Read cgroup usage stats BEFORE the kill closure runs —
+		// kill calls Cleanup which deletes the cgroup directory.
+		if p.opener != nil {
+			p.opener.reportUsage(p.artefact, p.manifest.Name)
+		}
 		if p.kill != nil {
 			err = p.kill()
 		}
