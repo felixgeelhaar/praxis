@@ -12,6 +12,9 @@ import (
 	"path/filepath"
 	"sort"
 	"sync"
+	"sync/atomic"
+
+	"github.com/felixgeelhaar/praxis/internal/capability"
 )
 
 // LoadEvent reports a single plugin's load outcome with enough metadata
@@ -43,33 +46,58 @@ type ManagerConfig struct {
 type Manager struct {
 	cfg ManagerConfig
 
-	mu     sync.RWMutex
-	loaded map[string]LoadEvent // pluginName -> last successful load
+	mu      sync.RWMutex
+	loaded  map[string]LoadEvent           // pluginName -> last successful load
+	wrapped map[string][]*versionedHandler // pluginName -> active versioned wrappers
+	retired map[string][]*versionedHandler // pluginName -> retired wrappers awaiting drain
+	version atomic.Uint64                  // monotonic per Manager
 }
 
 // NewManager constructs a Manager. Mandatory fields (Dir, Loader,
 // Opener) are validated lazily — LoadAll surfaces missing wiring as a
 // clear error rather than panicking at construction.
 func NewManager(cfg ManagerConfig) *Manager {
-	return &Manager{cfg: cfg, loaded: map[string]LoadEvent{}}
+	return &Manager{
+		cfg:     cfg,
+		loaded:  map[string]LoadEvent{},
+		wrapped: map[string][]*versionedHandler{},
+		retired: map[string][]*versionedHandler{},
+	}
 }
 
 // LoadAll runs the full discover→verify→open→Load pipeline once and
 // records the outcome of every plugin. Returns the underlying pipeline
 // error only if discovery fails outright; per-plugin failures populate
 // the Manager's loaded state and are surfaced via OnEvent.
+//
+// Existing wrappers are retired before the new pipeline runs so the
+// graceful drain semantics apply across full reloads — in-flight calls
+// finish on the version they started with, and Drain(name) on the
+// retired wrapper unblocks once they do.
 func (m *Manager) LoadAll(ctx context.Context) (PipelineResult, error) {
+	m.retireAll()
+
+	staging := map[string][]*versionedHandler{}
+	hooks := &LoadHooks{
+		WrapHandler: func(manifest Manifest, h capability.Handler) capability.Handler {
+			version := m.version.Add(1)
+			wrapped, vh := wrapForVersioning(h, version)
+			staging[manifest.Name] = append(staging[manifest.Name], vh)
+			return wrapped
+		},
+	}
+
 	res, err := RunPipeline(ctx, PipelineConfig{
 		Dir:         m.cfg.Dir,
 		TrustedKeys: m.cfg.TrustedKeys,
 		Loader:      m.cfg.Loader,
 		Opener:      m.cfg.Opener,
+		LoadHooks:   hooks,
 	})
 	if err != nil {
 		return res, err
 	}
 	m.mu.Lock()
-	defer m.mu.Unlock()
 	for _, p := range res.Loaded {
 		ev := LoadEvent{
 			Name:        p.Manifest.Name,
@@ -80,6 +108,9 @@ func (m *Manager) LoadAll(ctx context.Context) (PipelineResult, error) {
 			Result:      ResultSuccess,
 		}
 		m.loaded[ev.Name] = ev
+		if v, ok := staging[ev.Name]; ok {
+			m.wrapped[ev.Name] = v
+		}
 		m.fire(ev)
 	}
 	for _, e := range res.Errors {
@@ -90,13 +121,18 @@ func (m *Manager) LoadAll(ctx context.Context) (PipelineResult, error) {
 		}
 		m.fire(ev)
 	}
+	m.mu.Unlock()
 	return res, nil
 }
 
 // ReloadOne re-runs the pipeline scoped to a single plugin directory.
-// The lookup is by plugin Name (the one returned by Manifest()), not by
-// directory path — operators reload by capability identity, not by
+// The lookup is by plugin Name (the one returned by Manifest()), not
+// by directory path — operators reload by capability identity, not by
 // filesystem layout.
+//
+// The plugin's previous wrappers are retired before the new ones are
+// registered so in-flight calls drain naturally; Drain(name) is the
+// supported way to wait for that completion.
 func (m *Manager) ReloadOne(ctx context.Context, name string) error {
 	m.mu.RLock()
 	ev, ok := m.loaded[name]
@@ -108,17 +144,37 @@ func (m *Manager) ReloadOne(ctx context.Context, name string) error {
 	disc, err := loadManifest(ev.Dir)
 	if err != nil {
 		m.mu.Lock()
+		m.retireLocked(name)
 		delete(m.loaded, name)
+		delete(m.wrapped, name)
 		m.mu.Unlock()
 		failure := LoadEvent{Dir: ev.Dir, Result: ClassifyError(err), Err: err}
 		m.fire(failure)
 		return err
 	}
 
+	staged := []*versionedHandler{}
+	hooks := &LoadHooks{
+		WrapHandler: func(_ Manifest, h capability.Handler) capability.Handler {
+			version := m.version.Add(1)
+			wrapped, vh := wrapForVersioning(h, version)
+			staged = append(staged, vh)
+			return wrapped
+		},
+	}
+
+	// Retire the previous wrappers BEFORE the new ones register so a
+	// concurrent reader cannot see two active versions for the same
+	// capability name.
+	m.mu.Lock()
+	m.retireLocked(name)
+	m.mu.Unlock()
+
 	if err := loadOne(ctx, PipelineConfig{
 		TrustedKeys: m.cfg.TrustedKeys,
 		Loader:      m.cfg.Loader,
 		Opener:      m.cfg.Opener,
+		LoadHooks:   hooks,
 	}, disc); err != nil {
 		failure := LoadEvent{
 			Name:   disc.Manifest.Name,
@@ -140,9 +196,58 @@ func (m *Manager) ReloadOne(ctx context.Context, name string) error {
 	}
 	m.mu.Lock()
 	m.loaded[updated.Name] = updated
+	m.wrapped[updated.Name] = staged
 	m.mu.Unlock()
 	m.fire(updated)
 	return nil
+}
+
+// Drain blocks until every retired wrapper for the given plugin has
+// completed its in-flight calls. New traffic, which already routes to
+// the post-reload version, is unaffected. Returns immediately if the
+// plugin has no retired wrappers (fresh load with no prior version).
+//
+// Drained wrappers are removed from the retired pool so a follow-up
+// Drain call against the same name returns instantly rather than
+// re-walking already-completed calls.
+func (m *Manager) Drain(ctx context.Context, name string) error {
+	m.mu.Lock()
+	wrappers := m.retired[name]
+	delete(m.retired, name)
+	m.mu.Unlock()
+	for _, vh := range wrappers {
+		if err := vh.DrainCtx(ctx); err != nil {
+			// Re-park the not-yet-drained wrappers so a subsequent
+			// Drain (with a fresh ctx) can resume.
+			m.mu.Lock()
+			m.retired[name] = append(m.retired[name], vh)
+			m.mu.Unlock()
+			return err
+		}
+	}
+	return nil
+}
+
+// retireAll marks every currently-tracked wrapper retired. Called at
+// the start of LoadAll so a full re-scan replaces the entire tracked
+// set with the freshly-loaded one. Retired wrappers move into the
+// retired pool so Drain can still find them.
+func (m *Manager) retireAll() {
+	m.mu.Lock()
+	for name := range m.wrapped {
+		m.retireLocked(name)
+	}
+	m.wrapped = map[string][]*versionedHandler{}
+	m.mu.Unlock()
+}
+
+// retireLocked marks all current wrappers for `name` retired and
+// moves them into the retired pool. Caller must hold m.mu.
+func (m *Manager) retireLocked(name string) {
+	for _, vh := range m.wrapped[name] {
+		vh.Retire()
+		m.retired[name] = append(m.retired[name], vh)
+	}
 }
 
 // Snapshot returns the current set of loaded plugins, sorted by name

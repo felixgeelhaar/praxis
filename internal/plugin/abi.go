@@ -91,6 +91,24 @@ type Loader interface {
 // rolled back by the caller (the runtime must not allow half-loaded
 // plugins).
 func Load(ctx context.Context, p Plugin, loader Loader) error {
+	return LoadWithHooks(ctx, p, loader, nil)
+}
+
+// LoadHooks lets callers (the Manager) wrap handlers post-sandbox and
+// post-budgeting. A nil LoadHooks reduces to the original Load
+// behaviour. Phase 4 graceful rollover.
+type LoadHooks struct {
+	// WrapHandler runs against every Registration's handler after the
+	// optional Sandboxed wrap. The plugin's Manifest is supplied so the
+	// caller can record per-plugin state. Returning the same handler
+	// unchanged is the no-op default.
+	WrapHandler func(manifest Manifest, h capability.Handler) capability.Handler
+}
+
+// LoadWithHooks is Load with an optional WrapHandler hook. Used by the
+// Manager to layer versioned-handler tracking on top of the existing
+// sandbox wrapping without forking the load pipeline.
+func LoadWithHooks(ctx context.Context, p Plugin, loader Loader, hooks *LoadHooks) error {
 	if got := p.ABI(); got != ABIVersion {
 		return &ABIMismatchError{Want: ABIVersion, Got: got}
 	}
@@ -102,6 +120,12 @@ func Load(ctx context.Context, p Plugin, loader Loader) error {
 		budget := bp.Budget()
 		for i := range regs {
 			regs[i].Handler = Sandboxed(regs[i].Handler, budget)
+		}
+	}
+	if hooks != nil && hooks.WrapHandler != nil {
+		manifest := p.Manifest()
+		for i := range regs {
+			regs[i].Handler = hooks.WrapHandler(manifest, regs[i].Handler)
 		}
 	}
 	for _, r := range regs {

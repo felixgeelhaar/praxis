@@ -26,6 +26,10 @@ type PipelineConfig struct {
 	TrustedKeys []*ecdsa.PublicKey
 	Loader      Loader
 	Opener      Opener
+	// LoadHooks is forwarded to LoadWithHooks for every plugin loaded
+	// through the pipeline. Optional; nil reduces to the unhookable
+	// Load path.
+	LoadHooks *LoadHooks
 }
 
 // PipelineResult describes the outcome of one Pipeline run. Loaded is
@@ -157,7 +161,7 @@ func loadOne(ctx context.Context, cfg PipelineConfig, d Discovered) error {
 	if err != nil {
 		return fmt.Errorf("open plugin: %w", err)
 	}
-	if err := Load(ctx, p, cfg.Loader); err != nil {
+	if err := LoadWithHooks(ctx, p, cfg.Loader, cfg.LoadHooks); err != nil {
 		return err
 	}
 	return nil

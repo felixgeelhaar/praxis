@@ -6,6 +6,7 @@ import (
 	"errors"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/felixgeelhaar/praxis/internal/capability"
 	"github.com/felixgeelhaar/praxis/internal/domain"
@@ -104,6 +105,88 @@ func TestManager_OnEventFiresForSuccessAndError(t *testing.T) {
 	if events[0].Result != plugin.ResultSignature {
 		t.Errorf("result=%s want %s", events[0].Result, plugin.ResultSignature)
 	}
+}
+
+func TestManager_DrainBlocksUntilInFlightFinishes(t *testing.T) {
+	root := t.TempDir()
+	priv, pub := genKeyPEM(t, root, "trusted")
+	keys, _ := plugin.LoadTrustedKeys([]string{pub})
+	pluginDir := writeSignedPlugin(t, root, "p1", priv)
+
+	slow := &slowHandlerImpl{gate: make(chan struct{}), started: make(chan struct{}, 1)}
+
+	reg := capability.New()
+	opener := &fakeOpener{plugins: map[string]plugin.Plugin{
+		pluginDir: &fakePlugin{
+			abi:      plugin.ABIVersion,
+			manifest: plugin.Manifest{Name: "p1", Version: "1.0.0"},
+			caps: []plugin.Registration{
+				{Capability: domain.Capability{Name: "p1_slow"}, Handler: slow},
+			},
+		},
+	}}
+
+	mgr := plugin.NewManager(plugin.ManagerConfig{
+		Dir:         root,
+		TrustedKeys: keys,
+		Loader:      &registryLoader{reg: reg},
+		Opener:      opener,
+	})
+	if _, err := mgr.LoadAll(context.Background()); err != nil {
+		t.Fatalf("LoadAll: %v", err)
+	}
+
+	// Start a slow Execute via the registry-resolved handler.
+	h, err := reg.GetHandler("p1_slow")
+	if err != nil {
+		t.Fatalf("GetHandler: %v", err)
+	}
+	go func() {
+		_, _ = h.Execute(context.Background(), nil)
+	}()
+	<-slow.started
+
+	// Reload retires the old wrapper; Drain must block until the slow
+	// call returns.
+	if _, err := mgr.LoadAll(context.Background()); err != nil {
+		t.Fatalf("reload LoadAll: %v", err)
+	}
+
+	drained := make(chan struct{})
+	go func() {
+		_ = mgr.Drain(context.Background(), "p1")
+		close(drained)
+	}()
+
+	select {
+	case <-drained:
+		t.Fatal("Drain returned before in-flight Execute finished")
+	case <-time.After(40 * time.Millisecond):
+	}
+	close(slow.gate)
+	select {
+	case <-drained:
+	case <-time.After(200 * time.Millisecond):
+		t.Fatal("Drain did not return after Execute finished")
+	}
+}
+
+type slowHandlerImpl struct {
+	gate    chan struct{}
+	started chan struct{}
+}
+
+func (slowHandlerImpl) Name() string { return "p1_slow" }
+func (h *slowHandlerImpl) Execute(_ context.Context, _ map[string]any) (map[string]any, error) {
+	select {
+	case h.started <- struct{}{}:
+	default:
+	}
+	<-h.gate
+	return map[string]any{"ok": true}, nil
+}
+func (h *slowHandlerImpl) Simulate(ctx context.Context, p map[string]any) (map[string]any, error) {
+	return h.Execute(ctx, p)
 }
 
 func TestManager_SnapshotIsSorted(t *testing.T) {
