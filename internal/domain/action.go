@@ -33,6 +33,8 @@ type Action struct {
 	Result         map[string]any
 	Error          *ActionError
 	PolicyDecision *PolicyDecision
+	CallbackURL    string // optional: webhook posted on terminal status
+	CallbackSecret string // optional: HMAC-SHA256 secret for webhook signature
 	ExecutedAt     *time.Time
 	CompletedAt    *time.Time
 	CreatedAt      time.Time

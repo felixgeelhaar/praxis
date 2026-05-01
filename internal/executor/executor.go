@@ -23,6 +23,7 @@ import (
 	"github.com/felixgeelhaar/praxis/internal/policy"
 	"github.com/felixgeelhaar/praxis/internal/ports"
 	"github.com/felixgeelhaar/praxis/internal/schema"
+	"github.com/felixgeelhaar/praxis/internal/webhook"
 )
 
 // Outcomes accepts a terminal MnemosEvent for asynchronous delivery. The
@@ -42,6 +43,7 @@ type Executor struct {
 	runner     *handlerrunner.Runner
 	validator  *schema.Validator
 	limiter    *limiter.Limiter
+	webhook    *webhook.Notifier
 	actions    ports.ActionRepo
 	auditRepo  ports.AuditRepo
 	outcomes   Outcomes
@@ -68,6 +70,7 @@ func New(
 		runner:     runner,
 		validator:  validator,
 		limiter:    limiter.New(),
+		webhook:    webhook.New(logger, nil),
 		actions:    actions,
 		auditRepo:  auditRepo,
 		outcomes:   outcomes,
@@ -78,6 +81,10 @@ func New(
 // SetLimiter swaps in a pre-built Limiter (e.g. one shared across multiple
 // executors or backed by a distributed store).
 func (e *Executor) SetLimiter(l *limiter.Limiter) { e.limiter = l }
+
+// SetWebhookNotifier overrides the default notifier. Useful in tests and
+// when sharing a tuned http.Client across components.
+func (e *Executor) SetWebhookNotifier(n *webhook.Notifier) { e.webhook = n }
 
 // SetClock overrides time.Now — used by tests for deterministic timestamps.
 func (e *Executor) SetClock(now func() time.Time) { e.now = now }
@@ -364,6 +371,11 @@ func (e *Executor) terminateWithTimes(ctx context.Context, action domain.Action,
 	}
 	if e.outcomes != nil {
 		_ = e.outcomes.Emit(ctx, e.mnemosEvent(action, res))
+	}
+	if action.CallbackURL != "" && e.webhook != nil {
+		if werr := e.webhook.Notify(ctx, action, res); werr != nil {
+			e.logger.Error().Err(werr).Str("action_id", action.ID).Msg("webhook notify failed")
+		}
 	}
 	if ae != nil {
 		return res, errors.New(ae.Code + ": " + ae.Message)
