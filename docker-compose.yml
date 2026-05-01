@@ -1,0 +1,72 @@
+services:
+  praxis:
+    build:
+      context: .
+      args:
+        VERSION: ${VERSION:-dev}
+        COMMIT: ${COMMIT:-local}
+        BUILD_DATE: ${BUILD_DATE:-unknown}
+    image: praxis:${VERSION:-dev}
+    environment:
+      PRAXIS_HTTP_HOST: 0.0.0.0
+      PRAXIS_HTTP_PORT: 8080
+      PRAXIS_DB_TYPE: sqlite
+      PRAXIS_DB_CONN: file:/data/praxis.db
+      PRAXIS_API_TOKEN: ${PRAXIS_API_TOKEN:-}
+      PRAXIS_MNEMOS_URL: ${PRAXIS_MNEMOS_URL:-}
+      PRAXIS_MNEMOS_TOKEN: ${PRAXIS_MNEMOS_TOKEN:-}
+      SLACK_TOKEN: ${SLACK_TOKEN:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+    ports:
+      - "8080:8080"
+    volumes:
+      - praxis-data:/data
+    healthcheck:
+      test: ["CMD", "/app/praxis", "version"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  praxis-postgres:
+    profiles: ["postgres"]
+    build:
+      context: .
+    image: praxis:${VERSION:-dev}
+    environment:
+      PRAXIS_HTTP_HOST: 0.0.0.0
+      PRAXIS_HTTP_PORT: 8080
+      PRAXIS_DB_TYPE: postgres
+      PRAXIS_DB_CONN: postgres://praxis:praxis@postgres:5432/praxis?sslmode=disable
+      PRAXIS_API_TOKEN: ${PRAXIS_API_TOKEN:-}
+      PRAXIS_MNEMOS_URL: ${PRAXIS_MNEMOS_URL:-}
+      PRAXIS_MNEMOS_TOKEN: ${PRAXIS_MNEMOS_TOKEN:-}
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    profiles: ["postgres"]
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: praxis
+      POSTGRES_PASSWORD: praxis
+      POSTGRES_DB: praxis
+    ports:
+      - "5432:5432"
+    volumes:
+      - praxis-pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U praxis -d praxis"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  praxis-data:
+  praxis-pg:

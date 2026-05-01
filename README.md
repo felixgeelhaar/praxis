@@ -99,7 +99,78 @@ Praxis appears at exactly one step: the act of doing.
 
 ## Status
 
-**Pre-alpha.** Domain model, public contract, and integration boundaries are documented. MVP implementation in progress — see the [Roadmap](./Roadmap.md).
+**Phase 1 (MVP) shipped.** The execution primitive is runnable end to end: registry, schema validation (JSON Schema Draft 2020-12), policy, idempotency, executor, audit log with replay-from-audit canary, Slack and SMTP handlers, outcome writeback to Mnemos via an outbox, axi-go-style HTTP API, CLI, public Go client. SQLite, Postgres, and in-memory backends behind a shared contract suite. See the [Roadmap](./Roadmap.md) for what's next.
+
+---
+
+## Quick Start
+
+```bash
+# build
+make build
+
+# list registered capabilities
+./bin/praxis caps list
+
+# dry-run a send_email — no SMTP required
+./bin/praxis run send_email \
+  '{"to":"alex@example.com","subject":"hi","body":"hello"}' \
+  --dry-run
+
+# execute (degraded mode without SMTP_HOST returns a simulated success)
+./bin/praxis run send_email \
+  '{"to":"alex@example.com","subject":"hi","body":"hello"}'
+
+# inspect the action's audit trail
+./bin/praxis log show <action-id>
+
+# start the HTTP API
+./bin/praxis serve              # → :8080
+curl http://localhost:8080/healthz
+curl http://localhost:8080/v1/capabilities
+```
+
+Production-ish: run with persistent SQLite and a Mnemos endpoint.
+
+```bash
+PRAXIS_DB_TYPE=sqlite \
+PRAXIS_DB_CONN=file:praxis.db \
+PRAXIS_API_TOKEN=$(openssl rand -hex 32) \
+PRAXIS_MNEMOS_URL=http://mnemos.local/v1/events \
+PRAXIS_MNEMOS_TOKEN=... \
+SLACK_TOKEN=xoxb-... \
+./bin/praxis serve
+```
+
+Or via Docker:
+
+```bash
+docker compose up        # sqlite-backed, ports 8080 → host
+docker compose --profile postgres up   # postgres-backed
+```
+
+See [Configuration](#configuration) below for every `PRAXIS_*` variable.
+
+---
+
+## Configuration
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `PRAXIS_HTTP_HOST` | `0.0.0.0` | HTTP bind host |
+| `PRAXIS_HTTP_PORT` | `8080` | HTTP bind port |
+| `PRAXIS_API_TOKEN` | *unset* | Bearer token required by `/v1/*` (no auth when empty) |
+| `PRAXIS_DB_TYPE` | `memory` | `memory` · `sqlite` · `postgres` |
+| `PRAXIS_DB_CONN` | *unset* | Backend connection string |
+| `PRAXIS_MNEMOS_URL` | *unset* | Mnemos `/v1/events` endpoint for outcome writeback |
+| `PRAXIS_MNEMOS_TOKEN` | *unset* | Bearer token forwarded to Mnemos |
+| `PRAXIS_HANDLER_TIMEOUT` | `30s` | Per-handler timeout |
+| `PRAXIS_IDEMPOTENCY_TTL` | `24h` | Idempotency cache TTL |
+| `PRAXIS_POLICY_MODE` | `allow` | `allow` · `deny` · `rules` |
+| `SLACK_TOKEN` | *unset* | Slack Web API token (`send_message`) |
+| `SMTP_HOST` / `SMTP_PORT` / `SMTP_USERNAME` / `SMTP_PASSWORD` / `SMTP_FROM` | *varies* | SMTP creds for `send_email` |
+
+Capabilities run in **degraded mode** without credentials: `Execute` returns a simulated success so a developer can run end-to-end without configuring vendors.
 
 ---
 
