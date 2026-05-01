@@ -39,6 +39,7 @@ import (
 	"github.com/felixgeelhaar/praxis/internal/jobs"
 	pmcp "github.com/felixgeelhaar/praxis/internal/mcp"
 	"github.com/felixgeelhaar/praxis/internal/outcome"
+	"github.com/felixgeelhaar/praxis/internal/plugin"
 	"github.com/felixgeelhaar/praxis/internal/policy"
 	"github.com/felixgeelhaar/praxis/internal/ports"
 	"github.com/felixgeelhaar/praxis/internal/schema"
@@ -134,6 +135,10 @@ func bootstrap(ctx context.Context) (*runtime, func(), error) {
 	registry := capability.New()
 	registerHandlers(registry)
 
+	if err := loadPlugins(ctx, logger, cfg, registry); err != nil {
+		return nil, cleanup, err
+	}
+
 	pol := policy.New(logger, repos.Policy)
 	pol.SetMode(policy.Mode(cfg.PolicyMode))
 	idem := idempotency.New(repos.Idempotency)
@@ -156,6 +161,52 @@ func bootstrap(ctx context.Context) (*runtime, func(), error) {
 		logger: logger, cfg: cfg, repos: repos, exec: exec, reg: registry,
 		auditSvc: auditSvc, emitter: emitter,
 	}, cleanup, nil
+}
+
+// pluginRegistryLoader bridges the in-process *capability.Registry into
+// plugin.Loader. Phase 4 M3.1.
+type pluginRegistryLoader struct{ reg *capability.Registry }
+
+func (l *pluginRegistryLoader) Register(r plugin.Registration) error {
+	return l.reg.Register(r.Handler)
+}
+
+// loadPlugins runs the discover→verify→open→Load pipeline. Empty
+// PRAXIS_PLUGIN_DIR is a no-op. Per-plugin failures log and continue;
+// a hard error (missing dir, missing trust bundle while plugins exist)
+// surfaces as a bootstrap error so the operator notices.
+func loadPlugins(ctx context.Context, logger *bolt.Logger, cfg config.Config, reg *capability.Registry) error {
+	if cfg.PluginDir == "" {
+		return nil
+	}
+	keys, err := plugin.LoadTrustedKeys(cfg.PluginTrustedKeys)
+	if err != nil {
+		return fmt.Errorf("load trusted plugin keys: %w", err)
+	}
+	res, err := plugin.RunPipeline(ctx, plugin.PipelineConfig{
+		Dir:         cfg.PluginDir,
+		TrustedKeys: keys,
+		Loader:      &pluginRegistryLoader{reg: reg},
+		Opener:      plugin.DefaultOpener{},
+	})
+	if err != nil {
+		return fmt.Errorf("plugin pipeline: %w", err)
+	}
+	for _, e := range res.Errors {
+		logger.Error().
+			Str("plugin_dir", e.Dir).
+			Str("error", e.Err.Error()).
+			Msg("plugin load failed")
+	}
+	for _, p := range res.Loaded {
+		logger.Info().
+			Str("plugin_dir", p.Dir).
+			Str("name", p.Manifest.Name).
+			Str("version", p.Manifest.Version).
+			Str("abi", p.ABI).
+			Msg("plugin loaded")
+	}
+	return nil
 }
 
 func registerHandlers(reg *capability.Registry) {

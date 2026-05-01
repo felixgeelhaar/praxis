@@ -1,7 +1,7 @@
 {
   "id": "Praxis",
   "title": "Praxis",
-  "description": "Execution layer of the four-system cognitive stack (Mnemos, Chronos, Nous, Praxis). Exposes a registry of capabilities and executes actions under policy with idempotency, dry-run, and audit. Praxis does not decide; that belongs to Nous. This spec scopes Phase 1 (MVP) plus the foundation scaffolding to make the documented patterns runnable.",
+  "description": "Execution layer of the four-system cognitive stack (Mnemos, Chronos, Nous, Praxis). Exposes a registry of capabilities and executes actions under policy with idempotency, dry-run, and audit. Praxis does not decide; that belongs to Nous. This spec covers Phase 1 (MVP), Phase 2 (Policy \u0026 Resilience) and Phase 3 (Capability Ecosystem) per Roadmap.md.",
   "features": [
     {
       "id": "f1-foundation-scaffolding",
@@ -56,8 +56,110 @@
       "title": "Public Go Client",
       "description": "Typed Go client for callers, mirroring Mnemos client patterns. New constructor accepting WithToken, WithLogger (bolt), WithRetry (fortify). Methods ListCapabilities, Execute, DryRun, GetAction. APIError type with status + message, errors.As-friendly. Safe for concurrent use.",
       "requirements": []
+    },
+    {
+      "id": "f10-policy-engine-v2",
+      "title": "Policy Engine v2 - Default-Deny + Ordered Rules (Phase 2 M2.1)",
+      "description": "Phase-2 PolicyEngine adds default-deny mode (controlled by PRAXIS_POLICY_MODE), explicit first-match-wins ordering with PolicyRule.Priority, and fail-closed behaviour on PolicyRepo errors. Every Execute and DryRun records the matched rule on the action.",
+      "requirements": []
+    },
+    {
+      "id": "f11-async-actions",
+      "title": "Async Actions with At-Least-Once Drainer (Phase 2 M2.2)",
+      "description": "Action.Mode = sync | async. Async submissions persist as validated and return 202 Accepted; jobs.Runner drains validated/async rows from the actions table and resumes through Executor.Resume. At-least-once delivery is safe via the IdempotencyKeeper. Status pollable via GET /v1/actions/{id}.",
+      "requirements": []
+    },
+    {
+      "id": "f12-per-cap-retry",
+      "title": "Per-Capability Retry Configuration (Phase 2 M2.3)",
+      "description": "HandlerRunner.RunWithCapability builds a per-call fortify retry strategy from Capability.Retry (MaxAttempts, InitialDelay, MaxDelay, Multiplier), falling back to the global strategy when nil. The IsRetryable classifier is shared so semantics stay consistent across capabilities.",
+      "requirements": []
+    },
+    {
+      "id": "f13-rate-limiting",
+      "title": "Per-Capability + Per-Caller Rate Limiting (Phase 2 M2.4)",
+      "description": "fortify/ratelimit token bucket per (capability, caller) key. Capability.RateLimit declares Rate / Burst / Interval. Throttled actions emit policy_throttled audit events with retry_after_ms and are rejected with code rate_limited; the handler is never invoked.",
+      "requirements": []
+    },
+    {
+      "id": "f14-more-handlers",
+      "title": "Additional Capability Handlers (Phase 2 M2.6)",
+      "description": "Generic http_request handler shipped (any HTTP endpoint, idempotency-key forwarding). Pending vendor handlers - GitHub create_issue and comment, Linear/Jira create_issue and transition, Calendar schedule and invite.",
+      "requirements": []
+    },
+    {
+      "id": "f15-vendor-retry-after",
+      "title": "Vendor Retry-After Parsing (Phase 2 polish)",
+      "description": "Parse the vendor Retry-After header (delta-seconds or HTTP-date) on 429/503 responses and surface to the retry strategy so the next attempt waits at least that long. Wire through handlerrunner so all handlers benefit without per-handler code.",
+      "requirements": []
+    },
+    {
+      "id": "f16-async-webhooks",
+      "title": "Async Completion Webhook Delivery (Phase 2 polish)",
+      "description": "Action carries an optional callback_url. After an async action reaches a terminal status, post the Result to that URL with HMAC-SHA256 signature. Reuses the outcome outbox machinery for retry on 5xx + 429.",
+      "requirements": []
+    },
+    {
+      "id": "f17-plugin-architecture",
+      "title": "Out-of-Tree Plugin Architecture (Phase 3 M3.1)",
+      "description": "Stable handler ABI so third-party capability handlers can ship as separate Go modules or compiled plugins. On-disk discovery, signature verification (cosign-compatible), and a sandbox boundary enforcing CPU, memory, and network egress limits.",
+      "requirements": []
+    },
+    {
+      "id": "f18-mcp-surface",
+      "title": "MCP Capability Surface (Phase 3 M3.2)",
+      "description": "mcp-go server exposing ListCapabilities as MCP tool discovery and Execute/DryRun as tool calls. Same executor as the HTTP surface so audit + policy are uniformly applied. Capability descriptors shaped for agent-go consumption with no bespoke glue.",
+      "requirements": []
+    },
+    {
+      "id": "f19-multi-tenant-policy",
+      "title": "Multi-Tenant Policy and Audit (Phase 3 M3.3)",
+      "description": "Org / team / user scope hierarchy for policy rules and audit retention. Per-tenant capability registries so a tenant can register private capabilities. Per-tenant audit access controls so one tenant's audit is invisible to others.",
+      "requirements": []
+    },
+    {
+      "id": "f20-reversibility",
+      "title": "Reversibility via Capability.Compensate (Phase 3 M3.4)",
+      "description": "Capability.Compensate(ctx, originalResult) for capabilities whose effects can be reversed. praxis revert \u003caction-id\u003e runs the compensating action under the same audit umbrella, linking parent and revert via audit. Best-effort flag for vendors that cannot exactly reverse.",
+      "requirements": []
+    },
+    {
+      "id": "f21-compliance-governance",
+      "title": "Compliance, Audit Export, and PII Redaction (Phase 3 M3.5)",
+      "description": "Exportable audit (JSON, CSV) suitable for SOC 2 / HIPAA / GDPR review. Configurable PII redaction policy applied at audit detail level. Org-level dashboards covering capability usage, policy denials, and error rates.",
+      "requirements": []
+    },
+    {
+      "id": "plugin-pipeline-integration-into-cmd/praxis-startup",
+      "title": "Plugin pipeline integration into cmd/praxis startup",
+      "description": "Plugin discovery, signature verification, ABI load and sandbox wrapping are implemented as libraries but cmd/praxis bootstrap does not call them. Phase 4 wires the full pipeline: at startup, scan PRAXIS_PLUGIN_DIR, verify each Discovered against PRAXIS_PLUGIN_TRUSTED_KEYS, dlopen the artefact (Go plugin package), retrieve the exported `Plugin` symbol, call plugin.Load with the runtime registry as the Loader. Failures must (a) log the offending plugin and reason via bolt, (b) emit a metric praxis_plugin_load_total{result=...}, (c) refuse to start the server when the operator opts into strict mode (PRAXIS_PLUGIN_STRICT=1). Healthy plugins surface in /v1/capabilities. Cross-platform: Linux + macOS only (Go plugin package limitation). Replace the placeholder registerHandlers wiring with a registerCorePlus(loader) flow that registers built-in handlers first, plugins second, and rejects duplicate names.",
+      "requirements": []
+    },
+    {
+      "id": "audit-retention-scheduler",
+      "title": "Audit retention scheduler",
+      "description": "Service.PurgeExpired enforces per-tenant retention windows but no background worker invokes it. Add a scheduler that runs PurgeExpired every PRAXIS_AUDIT_RETENTION_INTERVAL (default 1h), logs deletion counts per tenant, exposes praxis_audit_purge_total{org_id,result}. Scheduler shares the bootstrap context so it stops on SIGTERM; first run happens after 5 minutes of uptime to avoid blocking startup. Failure to purge for one tenant must not stop the sweep for others (per-tenant errors logged, surfaced in metric, sweep continues).",
+      "requirements": []
+    },
+    {
+      "id": "mcp-and-cli-tenant-aware-capability-discovery",
+      "title": "MCP and CLI tenant-aware capability discovery",
+      "description": "HTTP /v1/capabilities derives a Caller from X-Praxis-* headers and uses ListCapabilitiesForCaller, but the MCP surface and the CLI still call the global ListCapabilities. Phase 4 plumbs caller context end-to-end: MCP server reads tenant identity from the MCP session/handshake (mcp-go conventions) and routes through ListCapabilitiesForCaller; CLI gains --org and --team flags on `praxis caps list` and `praxis caps show`. Anonymous CLI invocations stay global-only. The runtime contract is: every capability discovery path is tenant-aware or explicitly anonymous; there is no third option that silently leaks private capabilities.",
+      "requirements": []
+    },
+    {
+      "id": "out-of-process-plugin-loader-for-true-resource-isolation",
+      "title": "Out-of-process plugin loader for true resource isolation",
+      "description": "In-process sandbox enforces CPU timeout and HTTP egress allowlist but cannot enforce MaxMemoryBytes (Go's allocator is shared with the host process) and cannot stop a malicious plugin that bypasses plugin.HTTPClient. Phase 4 spec: each plugin runs in a child process spawned from a praxis-pluginhost binary; parent communicates via gRPC over stdin/stdout (or unix socket); host applies cgroups (Linux) / setrlimit (BSDs) for CPU and memory; network egress filtered at the host firewall layer using the AllowedHosts policy. Plugin ABI v1 stays unchanged from the plugin author's perspective: the praxis-pluginhost shim implements the Plugin interface and forwards each call across the IPC boundary. Failure modes documented: child crash → registration removed + metric incremented; OOM → MaxMemoryBytes enforced (the field gains real teeth).",
+      "requirements": []
+    },
+    {
+      "id": "plugin-lifecycle:-hot-reload-and-rotation",
+      "title": "Plugin lifecycle: hot reload and rotation",
+      "description": "Today plugins are loaded once at startup and stay until process exit. Phase 4 adds: filesystem watch on PRAXIS_PLUGIN_DIR using fsnotify; on manifest.json or .sig change, re-verify and re-load the affected plugin atomically (drain in-flight calls, swap registration); SIGHUP triggers a full re-scan; graceful version rollover where the old version completes its in-flight calls while new traffic routes to the new version; CLI `praxis plugins list` shows loaded plugins with version + signature digest; `praxis plugins reload \u003cname\u003e` forces a single-plugin reload. Operator can opt out of file-watch via PRAXIS_PLUGIN_AUTORELOAD=0.",
+      "requirements": []
     }
   ],
   "constraints": [],
-  "version": "0.1.0"
+  "version": "0.2.0"
 }
