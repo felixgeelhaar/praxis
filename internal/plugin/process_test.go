@@ -59,6 +59,16 @@ func (f *fakeChild) serve(in io.Reader, out io.Writer, done chan struct{}) {
 
 func newProcessOpener(t *testing.T, child *fakeChild) *plugin.ProcessOpener {
 	t.Helper()
+	return openerFromChild(child)
+}
+
+// newProcessOpenerForBench is the *testing.B variant; benches and
+// tests share the same pipe-paired SpawnFn through openerFromChild.
+func newProcessOpenerForBench(_ testing.TB, child *fakeChild) *plugin.ProcessOpener {
+	return openerFromChild(child)
+}
+
+func openerFromChild(child *fakeChild) *plugin.ProcessOpener {
 	return &plugin.ProcessOpener{
 		SpawnFn: func(_ context.Context, _ string) (io.WriteCloser, io.ReadCloser, func() error, error) {
 			parentToChild := newPipe()

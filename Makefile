@@ -58,7 +58,7 @@ check: fmt vet test build
 
 .PHONY: bench
 bench:
-	go test -bench=. -benchmem -run=^$$ -count=10 -benchtime=1s ./internal/executor/...
+	go test -bench=. -benchmem -run=^$$ -count=10 -benchtime=1s ./internal/executor/... ./internal/plugin/...
 
 .PHONY: release-check
 release-check: fmt vet lint test build
