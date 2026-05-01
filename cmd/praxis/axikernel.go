@@ -33,17 +33,19 @@ import (
 	"github.com/felixgeelhaar/praxis/internal/domain"
 	"github.com/felixgeelhaar/praxis/internal/executor"
 	"github.com/felixgeelhaar/praxis/internal/outcome"
+	"github.com/felixgeelhaar/praxis/internal/plugin"
 	"github.com/felixgeelhaar/praxis/internal/ports"
 )
 
 type kernelDeps struct {
-	logger   *bolt.Logger
-	exec     *executor.Executor
-	registry *capability.Registry
-	repos    *ports.Repos
-	auditSvc *audit.Service
-	emitter  *outcome.Emitter
-	apiToken string
+	logger        *bolt.Logger
+	exec          *executor.Executor
+	registry      *capability.Registry
+	repos         *ports.Repos
+	auditSvc      *audit.Service
+	pluginManager *plugin.Manager
+	emitter       *outcome.Emitter
+	apiToken      string
 }
 
 type metrics struct {
@@ -342,7 +344,58 @@ func newMux(deps kernelDeps, m *metrics) *http.ServeMux {
 		writeJSON(w, http.StatusOK, map[string]any{"action_id": id, "events": results})
 	})))
 
+	mux.Handle("GET /v1/plugins", traced(authed(func(w http.ResponseWriter, _ *http.Request) {
+		if deps.pluginManager == nil {
+			writeJSON(w, http.StatusOK, map[string]any{"plugins": []any{}})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"plugins": pluginViews(deps.pluginManager.Snapshot())})
+	})))
+
+	mux.Handle("POST /v1/plugins/{name}/reload", traced(authed(func(w http.ResponseWriter, r *http.Request) {
+		if deps.pluginManager == nil {
+			writeJSON(w, http.StatusServiceUnavailable, errResponse("plugin manager not configured"))
+			return
+		}
+		name := r.PathValue("name")
+		if err := deps.pluginManager.ReloadOne(r.Context(), name); err != nil {
+			if errors.Is(err, plugin.ErrPluginNotLoaded) {
+				writeJSON(w, http.StatusNotFound, errResponse(err.Error()))
+				return
+			}
+			writeJSON(w, http.StatusInternalServerError, errResponse(err.Error()))
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"name": name, "reloaded": true})
+	})))
+
 	return mux
+}
+
+// pluginView is the wire shape returned by GET /v1/plugins. Mirrors the
+// fields a CLI table renderer needs: name, version, ABI, and the
+// artefact digest so operators can confirm hosts are running the same
+// binary without diffing content.
+type pluginView struct {
+	Name        string `json:"name"`
+	Version     string `json:"version"`
+	ABI         string `json:"abi"`
+	Dir         string `json:"dir"`
+	ArtifactSHA string `json:"artifact_sha256"`
+}
+
+func pluginViews(events []plugin.LoadEvent) []pluginView {
+	out := make([]pluginView, 0, len(events))
+	for _, ev := range events {
+		out = append(out, pluginView{
+			Name:        ev.Name,
+			Version:     ev.Version,
+			ABI:         ev.ABI,
+			Dir:         ev.Dir,
+			ArtifactSHA: ev.ArtifactSHA,
+		})
+	}
+	return out
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {

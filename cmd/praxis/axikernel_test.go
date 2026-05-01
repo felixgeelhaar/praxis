@@ -88,6 +88,34 @@ func TestMetrics(t *testing.T) {
 	}
 }
 
+func TestPlugins_ListReturnsEmptyWhenManagerNil(t *testing.T) {
+	srv := newTestServer(t, "")
+	defer srv.Close()
+	resp, err := http.Get(srv.URL + "/v1/plugins")
+	if err != nil {
+		t.Fatalf("GET: %v", err)
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	if !strings.Contains(string(body), `"plugins":[]`) {
+		t.Errorf("body=%s want empty plugins list", body)
+	}
+}
+
+func TestPlugins_ReloadReturns503WhenManagerNil(t *testing.T) {
+	srv := newTestServer(t, "")
+	defer srv.Close()
+	req, _ := http.NewRequest(http.MethodPost, srv.URL+"/v1/plugins/x/reload", nil)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("POST: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusServiceUnavailable {
+		t.Errorf("status=%d want 503", resp.StatusCode)
+	}
+}
+
 func TestMetrics_AuditPurgeCounter(t *testing.T) {
 	logger := bolt.New(bolt.NewJSONHandler(io.Discard))
 	repos := memory.New()

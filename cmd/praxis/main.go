@@ -15,6 +15,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"os/signal"
@@ -70,6 +71,8 @@ func main() {
 		os.Exit(runAction(os.Args[2:]))
 	case "log":
 		os.Exit(runLog(os.Args[2:]))
+	case "plugins":
+		os.Exit(runPlugins(os.Args[2:]))
 	case "version", "--version", "-v":
 		fmt.Printf("praxis %s (commit %s, built %s)\n", Version, Commit, BuildDate)
 	case "help", "--help", "-h":
@@ -94,6 +97,8 @@ Usage:
   praxis run <cap> <json> [--dry-run] Execute or simulate a capability
   praxis revert <action-id>          Run the compensating action for a succeeded action
   praxis log show <action-id>        Show audit lifecycle for an action
+  praxis plugins list                List loaded plugins (against running server)
+  praxis plugins reload <name>       Force reload of one plugin
   praxis version                     Print version info
 
 Environment:
@@ -109,14 +114,15 @@ Environment:
 // --- shared bootstrap ---
 
 type runtime struct {
-	logger   *bolt.Logger
-	cfg      config.Config
-	repos    *ports.Repos
-	exec     *executor.Executor
-	reg      *capability.Registry
-	auditSvc *audit.Service
-	emitter  *outcome.Emitter
-	metrics  *metrics
+	logger        *bolt.Logger
+	cfg           config.Config
+	repos         *ports.Repos
+	exec          *executor.Executor
+	reg           *capability.Registry
+	auditSvc      *audit.Service
+	pluginManager *plugin.Manager
+	emitter       *outcome.Emitter
+	metrics       *metrics
 }
 
 func bootstrap(ctx context.Context) (*runtime, func(), error) {
@@ -139,7 +145,8 @@ func bootstrap(ctx context.Context) (*runtime, func(), error) {
 	registerHandlers(registry)
 
 	m := &metrics{}
-	if err := loadPlugins(ctx, logger, cfg, registry, m); err != nil {
+	pluginMgr, err := loadPlugins(ctx, logger, cfg, registry, m)
+	if err != nil {
 		return nil, cleanup, err
 	}
 
@@ -163,7 +170,8 @@ func bootstrap(ctx context.Context) (*runtime, func(), error) {
 
 	return &runtime{
 		logger: logger, cfg: cfg, repos: repos, exec: exec, reg: registry,
-		auditSvc: auditSvc, emitter: emitter, metrics: m,
+		auditSvc: auditSvc, pluginManager: pluginMgr,
+		emitter: emitter, metrics: m,
 	}, cleanup, nil
 }
 
@@ -181,7 +189,7 @@ func runSighupReload(ctx context.Context, rt *runtime) {
 			return
 		case <-ch:
 			rt.logger.Info().Msg("SIGHUP received; rescanning plugins")
-			if err := loadPlugins(ctx, rt.logger, rt.cfg, rt.reg, rt.metrics); err != nil {
+			if _, err := rt.pluginManager.LoadAll(ctx); err != nil {
 				rt.logger.Error().Err(err).Msg("SIGHUP plugin rescan failed")
 			}
 		}
@@ -196,50 +204,59 @@ func (l *pluginRegistryLoader) Register(r plugin.Registration) error {
 	return l.reg.Register(r.Handler)
 }
 
-// loadPlugins runs the discover→verify→open→Load pipeline. Empty
-// PRAXIS_PLUGIN_DIR is a no-op. Per-plugin failures log and continue
-// in non-strict mode; PRAXIS_PLUGIN_STRICT=1 turns any per-plugin
-// failure into a bootstrap error so production deployments fail fast
-// rather than running with a partially populated registry.
-func loadPlugins(ctx context.Context, logger *bolt.Logger, cfg config.Config, reg *capability.Registry, m *metrics) error {
+// loadPlugins builds the plugin Manager and runs the initial pipeline.
+// Empty PRAXIS_PLUGIN_DIR is a no-op (returns nil Manager). Per-plugin
+// failures log and continue in non-strict mode; PRAXIS_PLUGIN_STRICT=1
+// turns any per-plugin failure into a bootstrap error so production
+// deployments fail fast rather than running with a partially populated
+// registry.
+func loadPlugins(ctx context.Context, logger *bolt.Logger, cfg config.Config, reg *capability.Registry, m *metrics) (*plugin.Manager, error) {
 	if cfg.PluginDir == "" {
-		return nil
+		return nil, nil
 	}
 	keys, err := plugin.LoadTrustedKeys(cfg.PluginTrustedKeys)
 	if err != nil {
-		return fmt.Errorf("load trusted plugin keys: %w", err)
+		return nil, fmt.Errorf("load trusted plugin keys: %w", err)
 	}
-	res, err := plugin.RunPipeline(ctx, plugin.PipelineConfig{
+	mgr := plugin.NewManager(plugin.ManagerConfig{
 		Dir:         cfg.PluginDir,
 		TrustedKeys: keys,
 		Loader:      &pluginRegistryLoader{reg: reg},
 		Opener:      plugin.DefaultOpener{},
+		OnEvent: func(ev plugin.LoadEvent) {
+			m.incPluginLoad(ev.Result)
+			if ev.Result == plugin.ResultSuccess {
+				logger.Info().
+					Str("plugin_dir", ev.Dir).
+					Str("name", ev.Name).
+					Str("version", ev.Version).
+					Str("abi", ev.ABI).
+					Str("artifact_sha256", ev.ArtifactSHA).
+					Msg("plugin loaded")
+				return
+			}
+			logger.Error().
+				Str("plugin_dir", ev.Dir).
+				Str("result", ev.Result).
+				Str("error", errString(ev.Err)).
+				Msg("plugin load failed")
+		},
 	})
+	res, err := mgr.LoadAll(ctx)
 	if err != nil {
-		return fmt.Errorf("plugin pipeline: %w", err)
-	}
-	for _, e := range res.Errors {
-		result := plugin.ClassifyError(e.Err)
-		m.incPluginLoad(result)
-		logger.Error().
-			Str("plugin_dir", e.Dir).
-			Str("result", result).
-			Str("error", e.Err.Error()).
-			Msg("plugin load failed")
-	}
-	for _, p := range res.Loaded {
-		m.incPluginLoad(plugin.ResultSuccess)
-		logger.Info().
-			Str("plugin_dir", p.Dir).
-			Str("name", p.Manifest.Name).
-			Str("version", p.Manifest.Version).
-			Str("abi", p.ABI).
-			Msg("plugin loaded")
+		return nil, fmt.Errorf("plugin pipeline: %w", err)
 	}
 	if cfg.PluginStrict && len(res.Errors) > 0 {
-		return fmt.Errorf("plugin pipeline: %d plugin(s) failed to load and PRAXIS_PLUGIN_STRICT=1", len(res.Errors))
+		return nil, fmt.Errorf("plugin pipeline: %d plugin(s) failed to load and PRAXIS_PLUGIN_STRICT=1", len(res.Errors))
 	}
-	return nil
+	return mgr, nil
+}
+
+func errString(err error) string {
+	if err == nil {
+		return ""
+	}
+	return err.Error()
 }
 
 func registerHandlers(reg *capability.Registry) {
@@ -286,12 +303,12 @@ func runServe() int {
 	jobsRunner := jobs.New(rt.logger, rt.repos.Action, rt.exec, jobs.Config{})
 	go jobsRunner.Run(ctx)
 
-	if rt.cfg.PluginDir != "" && rt.cfg.PluginAutoreload {
+	if rt.pluginManager != nil && rt.cfg.PluginAutoreload {
 		w, werr := plugin.NewWatcher(plugin.WatcherConfig{
 			Root: rt.cfg.PluginDir,
 			OnReload: func(pluginDir string) {
 				rt.logger.Info().Str("plugin_dir", pluginDir).Msg("plugin change detected; reloading pipeline")
-				if err := loadPlugins(ctx, rt.logger, rt.cfg, rt.reg, rt.metrics); err != nil {
+				if _, err := rt.pluginManager.LoadAll(ctx); err != nil {
 					rt.logger.Error().Err(err).Msg("plugin reload failed")
 				}
 			},
@@ -309,7 +326,7 @@ func runServe() int {
 	// through verify+Load which is safe to repeat against unchanged
 	// plugins (Go's plugin.Open caches the *Plugin handle so dlopen is
 	// a no-op the second time).
-	if rt.cfg.PluginDir != "" {
+	if rt.pluginManager != nil {
 		go runSighupReload(ctx, rt)
 	}
 
@@ -330,8 +347,9 @@ func runServe() int {
 
 	mux := newMux(kernelDeps{
 		logger: rt.logger, exec: rt.exec, registry: rt.reg, repos: rt.repos,
-		auditSvc: rt.auditSvc,
-		emitter:  rt.emitter, apiToken: rt.cfg.APIToken,
+		auditSvc:      rt.auditSvc,
+		pluginManager: rt.pluginManager,
+		emitter:       rt.emitter, apiToken: rt.cfg.APIToken,
 	}, rt.metrics)
 
 	addr := fmt.Sprintf("%s:%d", rt.cfg.HTTPHost, rt.cfg.HTTPPort)
@@ -537,6 +555,95 @@ func runRevert(args []string) int {
 		return 1
 	}
 	return 0
+}
+
+// runPlugins routes the `plugins` subcommand. Both subcommands talk to
+// a running Praxis server over HTTP — the loaded-plugin registry lives
+// on the server, not on disk, so a CLI sub-process building its own
+// bootstrap would only ever see an empty list.
+func runPlugins(args []string) int {
+	if len(args) == 0 {
+		fmt.Fprintln(os.Stderr, "usage: praxis plugins [list|reload <name>]")
+		return 2
+	}
+	base := defaultEnv("PRAXIS_HTTP_URL", "http://127.0.0.1:8080")
+	token := os.Getenv("PRAXIS_API_TOKEN")
+	switch args[0] {
+	case "list":
+		return runPluginsList(base, token)
+	case "reload":
+		if len(args) < 2 {
+			fmt.Fprintln(os.Stderr, "usage: praxis plugins reload <name>")
+			return 2
+		}
+		return runPluginsReload(base, token, args[1])
+	default:
+		fmt.Fprintln(os.Stderr, "unknown plugins subcommand:", args[0])
+		return 2
+	}
+}
+
+func runPluginsList(base, token string) int {
+	body, err := pluginsHTTP(http.MethodGet, base+"/v1/plugins", token, nil)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "list plugins:", err)
+		return 1
+	}
+	var resp struct {
+		Plugins []pluginView `json:"plugins"`
+	}
+	if err := json.Unmarshal(body, &resp); err != nil {
+		fmt.Fprintln(os.Stderr, "decode response:", err)
+		return 1
+	}
+	if len(resp.Plugins) == 0 {
+		fmt.Println("(no plugins loaded)")
+		return 0
+	}
+	fmt.Printf("%-30s %-10s %-6s %-16s\n", "NAME", "VERSION", "ABI", "DIGEST")
+	for _, p := range resp.Plugins {
+		digest := p.ArtifactSHA
+		if len(digest) > 12 {
+			digest = digest[:12]
+		}
+		fmt.Printf("%-30s %-10s %-6s %-16s\n", p.Name, p.Version, p.ABI, digest)
+	}
+	return 0
+}
+
+func runPluginsReload(base, token, name string) int {
+	body, err := pluginsHTTP(http.MethodPost, base+"/v1/plugins/"+name+"/reload", token, nil)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "reload plugin:", err)
+		return 1
+	}
+	var resp map[string]any
+	_ = json.Unmarshal(body, &resp)
+	fmt.Printf("plugin %s reloaded\n", name)
+	return 0
+}
+
+func pluginsHTTP(method, url, token string, _ []byte) ([]byte, error) {
+	req, err := http.NewRequest(method, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	out, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode >= 400 {
+		return out, fmt.Errorf("HTTP %d: %s", resp.StatusCode, string(out))
+	}
+	return out, nil
 }
 
 func runLog(args []string) int {
