@@ -54,6 +54,7 @@ type metrics struct {
 	requestDurMs     atomic.Uint64
 	requestCount     atomic.Uint64
 	pluginLoad       sync.Map // result string -> *atomic.Uint64
+	auditPurge       sync.Map // "{orgID}\x00{result}" -> *atomic.Uint64
 }
 
 // incPluginLoad bumps the result-labelled plugin-load counter. Safe to
@@ -61,6 +62,17 @@ type metrics struct {
 func (m *metrics) incPluginLoad(result string) {
 	v, _ := m.pluginLoad.LoadOrStore(result, &atomic.Uint64{})
 	v.(*atomic.Uint64).Add(1)
+}
+
+// addAuditPurge records `count` audit rows deleted for the given org,
+// labelled by result (ok|error). Called by the retention scheduler's
+// OnPurge hook. The org_id and result are encoded as one map key with
+// a NUL separator since neither label can contain NUL — no collision
+// risk and one map lookup per increment.
+func (m *metrics) addAuditPurge(orgID, result string, count int64) {
+	key := orgID + "\x00" + result
+	v, _ := m.auditPurge.LoadOrStore(key, &atomic.Uint64{})
+	v.(*atomic.Uint64).Add(uint64(count))
 }
 
 func newMux(deps kernelDeps, m *metrics) *http.ServeMux {
@@ -87,6 +99,17 @@ func newMux(deps kernelDeps, m *metrics) *http.ServeMux {
 		fmt.Fprintf(w, "# TYPE praxis_plugin_load_total counter\n")
 		m.pluginLoad.Range(func(k, v any) bool {
 			fmt.Fprintf(w, "praxis_plugin_load_total{result=%q} %d\n", k.(string), v.(*atomic.Uint64).Load())
+			return true
+		})
+		fmt.Fprintf(w, "# HELP praxis_audit_purge_total Audit events purged by retention sweep.\n")
+		fmt.Fprintf(w, "# TYPE praxis_audit_purge_total counter\n")
+		m.auditPurge.Range(func(k, v any) bool {
+			parts := strings.SplitN(k.(string), "\x00", 2)
+			if len(parts) != 2 {
+				return true
+			}
+			fmt.Fprintf(w, "praxis_audit_purge_total{org_id=%q,result=%q} %d\n",
+				parts[0], parts[1], v.(*atomic.Uint64).Load())
 			return true
 		})
 		count := m.requestCount.Load()

@@ -268,6 +268,13 @@ func runServe() int {
 			InitialDelay: rt.cfg.AuditRetentionInitialDelay,
 			Interval:     rt.cfg.AuditRetentionInterval,
 		})
+		sched.OnPurge = func(orgID string, deleted int64, err error) {
+			result := "ok"
+			if err != nil {
+				result = "error"
+			}
+			rt.metrics.addAuditPurge(orgID, result, deleted)
+		}
 		go sched.Run(ctx)
 	}
 
