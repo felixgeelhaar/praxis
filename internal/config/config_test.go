@@ -134,6 +134,32 @@ func TestLoad_AuditRetentionInterval_Override(t *testing.T) {
 	}
 }
 
+func TestLoad_PluginAutoreload_DefaultsOn(t *testing.T) {
+	t.Setenv("PRAXIS_PLUGIN_AUTORELOAD", "")
+	c, err := config.Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if !c.PluginAutoreload {
+		t.Error("PluginAutoreload default must be true")
+	}
+}
+
+func TestLoad_PluginAutoreload_ExplicitOff(t *testing.T) {
+	for _, v := range []string{"0", "false", "no", "off"} {
+		t.Run(v, func(t *testing.T) {
+			t.Setenv("PRAXIS_PLUGIN_AUTORELOAD", v)
+			c, err := config.Load()
+			if err != nil {
+				t.Fatalf("Load: %v", err)
+			}
+			if c.PluginAutoreload {
+				t.Errorf("PluginAutoreload=%s should be false", v)
+			}
+		})
+	}
+}
+
 func TestLoad_PluginStrict_Default(t *testing.T) {
 	t.Setenv("PRAXIS_PLUGIN_STRICT", "")
 	c, err := config.Load()

@@ -265,6 +265,23 @@ func runServe() int {
 	jobsRunner := jobs.New(rt.logger, rt.repos.Action, rt.exec, jobs.Config{})
 	go jobsRunner.Run(ctx)
 
+	if rt.cfg.PluginDir != "" && rt.cfg.PluginAutoreload {
+		w, werr := plugin.NewWatcher(plugin.WatcherConfig{
+			Root: rt.cfg.PluginDir,
+			OnReload: func(pluginDir string) {
+				rt.logger.Info().Str("plugin_dir", pluginDir).Msg("plugin change detected; reloading pipeline")
+				if err := loadPlugins(ctx, rt.logger, rt.cfg, rt.reg, rt.metrics); err != nil {
+					rt.logger.Error().Err(err).Msg("plugin reload failed")
+				}
+			},
+		})
+		if werr != nil {
+			rt.logger.Error().Err(werr).Msg("plugin watcher disabled")
+		} else {
+			go w.Run(ctx)
+		}
+	}
+
 	if len(rt.cfg.AuditRetention) > 0 {
 		sched := audit.NewScheduler(rt.auditSvc, rt.logger, audit.SchedulerConfig{
 			InitialDelay: rt.cfg.AuditRetentionInitialDelay,

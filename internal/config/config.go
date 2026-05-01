@@ -27,6 +27,7 @@ type Config struct {
 	PluginDir                  string        // PRAXIS_PLUGIN_DIR; empty disables plugin discovery
 	PluginTrustedKeys          []string      // PRAXIS_PLUGIN_TRUSTED_KEYS; PEM ECDSA public keys for cosign-blob verification
 	PluginStrict               bool          // PRAXIS_PLUGIN_STRICT=1; any plugin load error aborts startup
+	PluginAutoreload           bool          // PRAXIS_PLUGIN_AUTORELOAD; default true. fsnotify-driven hot reload.
 	AuditRetentionInterval     time.Duration // PRAXIS_AUDIT_RETENTION_INTERVAL; cadence between sweeps
 	AuditRetentionInitialDelay time.Duration // PRAXIS_AUDIT_RETENTION_INITIAL_DELAY; defer first sweep
 	// AuditRetention maps OrgID to retention window. The empty key is the
@@ -56,6 +57,7 @@ func Load() (Config, error) {
 		PluginDir:                  os.Getenv("PRAXIS_PLUGIN_DIR"),
 		PluginTrustedKeys:          parseList(os.Getenv("PRAXIS_PLUGIN_TRUSTED_KEYS")),
 		PluginStrict:               parseBool(os.Getenv("PRAXIS_PLUGIN_STRICT")),
+		PluginAutoreload:           parseBoolDefault(os.Getenv("PRAXIS_PLUGIN_AUTORELOAD"), true),
 		AuditRetention:             parseRetention(os.Getenv("PRAXIS_AUDIT_RETENTION")),
 		AuditRetentionInterval:     getDur("PRAXIS_AUDIT_RETENTION_INTERVAL", time.Hour),
 		AuditRetentionInitialDelay: getDur("PRAXIS_AUDIT_RETENTION_INITIAL_DELAY", 5*time.Minute),
@@ -120,6 +122,19 @@ func parseBool(raw string) bool {
 		return true
 	}
 	return false
+}
+
+// parseBoolDefault is parseBool with a configurable default for unset
+// or unrecognised values. Used for opt-out flags where the default is
+// "on" (PRAXIS_PLUGIN_AUTORELOAD).
+func parseBoolDefault(raw string, def bool) bool {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case "1", "true", "yes", "on":
+		return true
+	case "0", "false", "no", "off":
+		return false
+	}
+	return def
 }
 
 // parseList splits a comma-separated env var into trimmed non-empty
