@@ -1,0 +1,281 @@
+// axikernel.go wires the HTTP surface for Praxis. It mirrors the Mnemos
+// pattern: one place where routes are declared, errors are mapped to HTTP
+// status codes, and authentication is enforced.
+//
+// Endpoints (per docs/integrations.md):
+//
+//	GET  /healthz
+//	GET  /metrics
+//	GET  /v1/capabilities
+//	GET  /v1/capabilities/{name}
+//	POST /v1/actions
+//	GET  /v1/actions/{id}
+//	POST /v1/actions/{id}/dry-run
+//	GET  /v1/audit
+package main
+
+import (
+	"crypto/rand"
+	"encoding/hex"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"net/http"
+	"strconv"
+	"strings"
+	"sync/atomic"
+	"time"
+
+	"github.com/felixgeelhaar/bolt"
+	"github.com/felixgeelhaar/praxis/internal/capability"
+	"github.com/felixgeelhaar/praxis/internal/domain"
+	"github.com/felixgeelhaar/praxis/internal/executor"
+	"github.com/felixgeelhaar/praxis/internal/outcome"
+	"github.com/felixgeelhaar/praxis/internal/ports"
+)
+
+type kernelDeps struct {
+	logger   *bolt.Logger
+	exec     *executor.Executor
+	registry *capability.Registry
+	repos    *ports.Repos
+	emitter  *outcome.Emitter
+	apiToken string
+}
+
+type metrics struct {
+	actionsTotal     atomic.Uint64
+	actionsFailed    atomic.Uint64
+	actionsRejected  atomic.Uint64
+	actionsSimulated atomic.Uint64
+	requestDurMs     atomic.Uint64
+	requestCount     atomic.Uint64
+}
+
+func newMux(deps kernelDeps, m *metrics) *http.ServeMux {
+	mux := http.NewServeMux()
+
+	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, http.StatusOK, map[string]any{"status": "ok"})
+	})
+
+	mux.HandleFunc("GET /metrics", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain; version=0.0.4")
+		delivered, failures := deps.emitter.Stats()
+		fmt.Fprintf(w, "# HELP praxis_actions_total Number of actions processed by status.\n")
+		fmt.Fprintf(w, "# TYPE praxis_actions_total counter\n")
+		fmt.Fprintf(w, "praxis_actions_total{status=\"succeeded\"} %d\n", m.actionsTotal.Load()-m.actionsFailed.Load()-m.actionsRejected.Load()-m.actionsSimulated.Load())
+		fmt.Fprintf(w, "praxis_actions_total{status=\"failed\"} %d\n", m.actionsFailed.Load())
+		fmt.Fprintf(w, "praxis_actions_total{status=\"rejected\"} %d\n", m.actionsRejected.Load())
+		fmt.Fprintf(w, "praxis_actions_total{status=\"simulated\"} %d\n", m.actionsSimulated.Load())
+		fmt.Fprintf(w, "# HELP praxis_outcome_emit_total Mnemos delivery counters.\n")
+		fmt.Fprintf(w, "# TYPE praxis_outcome_emit_total counter\n")
+		fmt.Fprintf(w, "praxis_outcome_emit_total{result=\"delivered\"} %d\n", delivered)
+		fmt.Fprintf(w, "praxis_outcome_emit_total{result=\"failed\"} %d\n", failures)
+		count := m.requestCount.Load()
+		var avg uint64
+		if count > 0 {
+			avg = m.requestDurMs.Load() / count
+		}
+		fmt.Fprintf(w, "# HELP praxis_request_duration_ms_avg Average HTTP request duration.\n")
+		fmt.Fprintf(w, "praxis_request_duration_ms_avg %d\n", avg)
+	})
+
+	authed := func(h http.HandlerFunc) http.HandlerFunc {
+		return func(w http.ResponseWriter, r *http.Request) {
+			if deps.apiToken != "" {
+				want := "Bearer " + deps.apiToken
+				if r.Header.Get("Authorization") != want {
+					writeJSON(w, http.StatusUnauthorized, errResponse("unauthorized"))
+					return
+				}
+			}
+			h(w, r)
+		}
+	}
+
+	traced := func(h http.HandlerFunc) http.HandlerFunc {
+		return func(w http.ResponseWriter, r *http.Request) {
+			start := time.Now()
+			h(w, r)
+			dur := time.Since(start).Milliseconds()
+			m.requestDurMs.Add(uint64(dur))
+			m.requestCount.Add(1)
+			deps.logger.Info().
+				Str("method", r.Method).
+				Str("path", r.URL.Path).
+				Int64("dur_ms", dur).
+				Msg("http")
+		}
+	}
+
+	mux.Handle("GET /v1/capabilities", traced(authed(func(w http.ResponseWriter, r *http.Request) {
+		caps, err := deps.exec.ListCapabilities(r.Context())
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, errResponse(err.Error()))
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"capabilities": caps})
+	})))
+
+	mux.Handle("GET /v1/capabilities/{name}", traced(authed(func(w http.ResponseWriter, r *http.Request) {
+		name := r.PathValue("name")
+		cap, err := deps.registry.GetCapability(name)
+		if err != nil {
+			writeJSON(w, http.StatusNotFound, errResponse("capability not found"))
+			return
+		}
+		writeJSON(w, http.StatusOK, cap)
+	})))
+
+	mux.Handle("POST /v1/actions", traced(authed(func(w http.ResponseWriter, r *http.Request) {
+		action, err := decodeAction(r)
+		if err != nil {
+			writeJSON(w, http.StatusBadRequest, errResponse(err.Error()))
+			return
+		}
+		m.actionsTotal.Add(1)
+		res, execErr := deps.exec.Execute(r.Context(), action)
+		switch res.Status {
+		case domain.StatusFailed:
+			m.actionsFailed.Add(1)
+		case domain.StatusRejected:
+			m.actionsRejected.Add(1)
+		}
+		status := http.StatusOK
+		if execErr != nil {
+			status = httpStatusForExecError(execErr, res)
+		}
+		writeJSON(w, status, res)
+	})))
+
+	mux.Handle("GET /v1/actions/{id}", traced(authed(func(w http.ResponseWriter, r *http.Request) {
+		id := r.PathValue("id")
+		a, err := deps.repos.Action.Get(r.Context(), id)
+		if errors.Is(err, ports.ErrNotFound) {
+			writeJSON(w, http.StatusNotFound, errResponse("action not found"))
+			return
+		}
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, errResponse(err.Error()))
+			return
+		}
+		writeJSON(w, http.StatusOK, a)
+	})))
+
+	mux.Handle("POST /v1/actions/{id}/dry-run", traced(authed(func(w http.ResponseWriter, r *http.Request) {
+		action, err := decodeAction(r)
+		if err != nil {
+			writeJSON(w, http.StatusBadRequest, errResponse(err.Error()))
+			return
+		}
+		if id := r.PathValue("id"); id != "" {
+			action.ID = id
+		}
+		m.actionsTotal.Add(1)
+		m.actionsSimulated.Add(1)
+		sim, drErr := deps.exec.DryRun(r.Context(), action)
+		if drErr != nil {
+			writeJSON(w, http.StatusBadRequest, errResponse(drErr.Error()))
+			return
+		}
+		writeJSON(w, http.StatusOK, sim)
+	})))
+
+	mux.Handle("GET /v1/audit", traced(authed(func(w http.ResponseWriter, r *http.Request) {
+		q := ports.AuditQuery{
+			Capability: r.URL.Query().Get("capability"),
+			CallerType: r.URL.Query().Get("caller_type"),
+		}
+		if from := r.URL.Query().Get("from"); from != "" {
+			if v, err := strconv.ParseInt(from, 10, 64); err == nil {
+				q.From = v
+			}
+		}
+		if to := r.URL.Query().Get("to"); to != "" {
+			if v, err := strconv.ParseInt(to, 10, 64); err == nil {
+				q.To = v
+			}
+		}
+		results, err := deps.repos.Audit.Search(r.Context(), q)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, errResponse(err.Error()))
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"events": results})
+	})))
+
+	mux.Handle("GET /v1/audit/{action_id}", traced(authed(func(w http.ResponseWriter, r *http.Request) {
+		id := r.PathValue("action_id")
+		results, err := deps.repos.Audit.ListForAction(r.Context(), id)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, errResponse(err.Error()))
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"action_id": id, "events": results})
+	})))
+
+	return mux
+}
+
+func writeJSON(w http.ResponseWriter, status int, v any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(v)
+}
+
+func errResponse(msg string) map[string]any {
+	return map[string]any{"error": msg}
+}
+
+func decodeAction(r *http.Request) (domain.Action, error) {
+	var a domain.Action
+	if r.Body == nil {
+		return a, fmt.Errorf("empty body")
+	}
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&a); err != nil {
+		return a, fmt.Errorf("decode body: %w", err)
+	}
+	if a.ID == "" {
+		a.ID = generateID()
+	}
+	if a.IdempotencyKey == "" {
+		a.IdempotencyKey = a.ID
+	}
+	a.Status = domain.StatusPending
+	a.CreatedAt = time.Now()
+	a.UpdatedAt = a.CreatedAt
+	return a, nil
+}
+
+func httpStatusForExecError(err error, res domain.Result) int {
+	if res.Status == domain.StatusRejected {
+		switch {
+		case strings.HasPrefix(err.Error(), "unknown_capability"):
+			return http.StatusNotFound
+		case strings.HasPrefix(err.Error(), "validation_failed"):
+			return http.StatusBadRequest
+		case strings.HasPrefix(err.Error(), "policy_denied"):
+			return http.StatusForbidden
+		default:
+			return http.StatusBadRequest
+		}
+	}
+	if res.Status == domain.StatusFailed {
+		if res.Error != nil && res.Error.Retryable {
+			return http.StatusServiceUnavailable
+		}
+		return http.StatusInternalServerError
+	}
+	return http.StatusInternalServerError
+}
+
+func generateID() string {
+	b := make([]byte, 8)
+	if _, err := rand.Read(b); err != nil {
+		return fmt.Sprintf("act-%d", time.Now().UnixNano())
+	}
+	return "act-" + hex.EncodeToString(b)
+}
