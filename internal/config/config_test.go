@@ -47,6 +47,28 @@ func TestLoad_UnknownBackend(t *testing.T) {
 	}
 }
 
+func TestLoad_PluginDirDefaultsEmpty(t *testing.T) {
+	t.Setenv("PRAXIS_PLUGIN_DIR", "")
+	c, err := config.Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if c.PluginDir != "" {
+		t.Errorf("PluginDir=%q want empty", c.PluginDir)
+	}
+}
+
+func TestLoad_PluginDirOverride(t *testing.T) {
+	t.Setenv("PRAXIS_PLUGIN_DIR", "/opt/praxis/plugins")
+	c, err := config.Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if c.PluginDir != "/opt/praxis/plugins" {
+		t.Errorf("PluginDir=%q", c.PluginDir)
+	}
+}
+
 func TestLoad_OverridesViaEnv(t *testing.T) {
 	t.Setenv("PRAXIS_DB_TYPE", "sqlite")
 	t.Setenv("PRAXIS_DB_CONN", "praxis.db")

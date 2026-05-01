@@ -24,6 +24,7 @@ type Config struct {
 	PolicyMode      string // allow | deny | rules
 	OutboxBatchSize int
 	OutboxPollEvery time.Duration
+	PluginDir       string // PRAXIS_PLUGIN_DIR; empty disables plugin discovery
 }
 
 // Load reads configuration from the process environment, applying defaults
@@ -43,6 +44,7 @@ func Load() (Config, error) {
 		PolicyMode:      strings.ToLower(getEnv("PRAXIS_POLICY_MODE", "allow")),
 		OutboxBatchSize: getInt("PRAXIS_OUTBOX_BATCH_SIZE", 32),
 		OutboxPollEvery: getDur("PRAXIS_OUTBOX_POLL_EVERY", 2*time.Second),
+		PluginDir:       os.Getenv("PRAXIS_PLUGIN_DIR"),
 	}
 
 	switch c.DBType {
