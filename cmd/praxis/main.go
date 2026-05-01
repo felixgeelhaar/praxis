@@ -30,6 +30,7 @@ import (
 	"github.com/felixgeelhaar/praxis/internal/executor"
 	"github.com/felixgeelhaar/praxis/internal/handlerrunner"
 	emailhandler "github.com/felixgeelhaar/praxis/internal/handlers/email"
+	githubhandler "github.com/felixgeelhaar/praxis/internal/handlers/github"
 	httphandler "github.com/felixgeelhaar/praxis/internal/handlers/http"
 	slackhandler "github.com/felixgeelhaar/praxis/internal/handlers/slack"
 	"github.com/felixgeelhaar/praxis/internal/idempotency"
@@ -159,6 +160,9 @@ func registerHandlers(reg *capability.Registry) {
 		From:     os.Getenv("SMTP_FROM"),
 	}))
 	_ = reg.Register(httphandler.New(httphandler.Config{}))
+	ghCfg := githubhandler.Config{Token: os.Getenv("GITHUB_TOKEN")}
+	_ = reg.Register(githubhandler.NewCreateIssue(ghCfg))
+	_ = reg.Register(githubhandler.NewAddComment(ghCfg))
 }
 
 func defaultEnv(k, def string) string {
