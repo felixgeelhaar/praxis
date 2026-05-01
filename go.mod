@@ -11,7 +11,7 @@ require (
 	github.com/jackc/pgx/v5 v5.9.2
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2
 	github.com/slack-go/slack v0.23.0
-	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.56.0
+	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.68.0
 	go.opentelemetry.io/otel v1.43.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.43.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.43.0
