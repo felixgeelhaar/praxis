@@ -1,134 +1,359 @@
 {
   "project_id": "Praxis",
-  "version": 5,
+  "version": 81,
   "task_states": {
     "t-action-fsm": {
       "status": "done",
       "path": "",
-      "elapsed_minutes": 60,
       "owner": "ai-agent",
-      "started_at": "2026-05-01T08:32:46.253850+00:00",
-      "completed_at": "2026-05-01T08:32:46.253850+00:00"
+      "started_at": "2026-05-01T08:32:46.25385Z",
+      "completed_at": "2026-05-01T08:32:46.25385Z",
+      "elapsed_minutes": 60
+    },
+    "t-async-202-response": {
+      "status": "done",
+      "path": "",
+      "owner": "ai-agent",
+      "started_at": "2026-05-01T10:17:20.595047Z",
+      "completed_at": "2026-05-01T10:17:20.595047Z",
+      "elapsed_minutes": 60
+    },
+    "t-async-jobs-runner": {
+      "status": "done",
+      "path": "",
+      "owner": "ai-agent",
+      "started_at": "2026-05-01T10:17:20.595047Z",
+      "completed_at": "2026-05-01T10:17:20.595047Z",
+      "elapsed_minutes": 60
+    },
+    "t-async-mode-schema-and-port": {
+      "status": "done",
+      "path": "",
+      "owner": "ai-agent",
+      "started_at": "2026-05-01T10:17:20.595047Z",
+      "completed_at": "2026-05-01T10:17:20.595047Z",
+      "elapsed_minutes": 60
+    },
+    "t-async-webhook-callback": {
+      "status": "done",
+      "path": "",
+      "owner": "ai-agent",
+      "started_at": "2026-05-01T11:01:33.7832Z",
+      "completed_at": "2026-05-01T11:01:33.7832Z",
+      "elapsed_minutes": 90
+    },
+    "t-audit-export-json-csv": {
+      "status": "done",
+      "path": "",
+      "owner": "ai-agent",
+      "started_at": "2026-05-01T13:06:41.574263Z",
+      "completed_at": "2026-05-01T13:06:41.574263Z",
+      "elapsed_minutes": 90
     },
     "t-audit-log": {
       "status": "done",
       "path": "",
-      "elapsed_minutes": 60,
       "owner": "ai-agent",
-      "started_at": "2026-05-01T08:32:46.253850+00:00",
-      "completed_at": "2026-05-01T08:32:46.253850+00:00"
+      "started_at": "2026-05-01T08:32:46.25385Z",
+      "completed_at": "2026-05-01T08:32:46.25385Z",
+      "elapsed_minutes": 60
+    },
+    "t-audit-pii-redaction": {
+      "status": "done",
+      "path": "",
+      "owner": "ai-agent",
+      "started_at": "2026-05-01T13:06:41.574263Z",
+      "completed_at": "2026-05-01T13:06:41.574263Z",
+      "elapsed_minutes": 90
+    },
+    "t-audit-purge-metrics": {
+      "status": "done",
+      "path": "",
+      "owner": "claude-code",
+      "evidence": [
+        "1d42609"
+      ],
+      "started_at": "2026-05-01T20:30:36.379252+02:00",
+      "completed_at": "2026-05-01T20:33:01.925031+02:00",
+      "elapsed_minutes": 2
     },
     "t-audit-replay-test": {
       "status": "done",
       "path": "",
-      "elapsed_minutes": 60,
       "owner": "ai-agent",
-      "started_at": "2026-05-01T08:32:46.253850+00:00",
-      "completed_at": "2026-05-01T08:32:46.253850+00:00"
+      "started_at": "2026-05-01T08:32:46.25385Z",
+      "completed_at": "2026-05-01T08:32:46.25385Z",
+      "elapsed_minutes": 60
+    },
+    "t-audit-retention-scheduler": {
+      "status": "done",
+      "path": "",
+      "owner": "claude-code",
+      "evidence": [
+        "9093b16"
+      ],
+      "started_at": "2026-05-01T19:58:19.863352+02:00",
+      "completed_at": "2026-05-01T20:01:27.145225+02:00",
+      "elapsed_minutes": 3
+    },
+    "t-bench-ci-regression": {
+      "status": "done",
+      "path": "",
+      "owner": "claude-code",
+      "evidence": [
+        "252400b"
+      ],
+      "started_at": "2026-05-01T23:00:03.844433+02:00",
+      "completed_at": "2026-05-01T23:10:00.56115+02:00",
+      "elapsed_minutes": 9
+    },
+    "t-bench-out-of-process": {
+      "status": "done",
+      "path": "",
+      "owner": "claude-code",
+      "evidence": [
+        "2eff23d"
+      ],
+      "started_at": "2026-05-01T22:56:18.089253+02:00",
+      "completed_at": "2026-05-01T22:59:31.54801+02:00",
+      "elapsed_minutes": 3
+    },
+    "t-bench-publish-docs": {
+      "status": "done",
+      "path": "",
+      "owner": "claude-code",
+      "evidence": [
+        "2a308d2"
+      ],
+      "started_at": "2026-05-01T23:12:03.735922+02:00",
+      "completed_at": "2026-05-01T23:16:49.507284+02:00",
+      "elapsed_minutes": 4
+    },
+    "t-bench-suite-scaffolding": {
+      "status": "done",
+      "path": "",
+      "owner": "claude-code",
+      "evidence": [
+        "90a4278"
+      ],
+      "started_at": "2026-05-01T22:51:03.126255+02:00",
+      "completed_at": "2026-05-01T22:55:04.209766+02:00",
+      "elapsed_minutes": 4
+    },
+    "t-capability-compensate": {
+      "status": "done",
+      "path": "",
+      "owner": "ai-agent",
+      "started_at": "2026-05-01T13:09:10.065Z",
+      "completed_at": "2026-05-01T13:09:10.065Z",
+      "elapsed_minutes": 90
     },
     "t-capability-registry": {
       "status": "done",
       "path": "",
-      "elapsed_minutes": 60,
       "owner": "ai-agent",
-      "started_at": "2026-05-01T08:32:46.253850+00:00",
-      "completed_at": "2026-05-01T08:32:46.253850+00:00"
+      "started_at": "2026-05-01T08:32:46.25385Z",
+      "completed_at": "2026-05-01T08:32:46.25385Z",
+      "elapsed_minutes": 60
+    },
+    "t-cgroup-v2-detect": {
+      "status": "done",
+      "path": "",
+      "owner": "claude-code",
+      "evidence": [
+        "d2e9c56"
+      ],
+      "started_at": "2026-05-01T23:18:23.34435+02:00",
+      "completed_at": "2026-05-01T23:21:36.925793+02:00",
+      "elapsed_minutes": 3
+    },
+    "t-cgroup-v2-spawn": {
+      "status": "done",
+      "path": "",
+      "owner": "claude-code",
+      "evidence": [
+        "bf07310"
+      ],
+      "started_at": "2026-05-01T23:22:44.986846+02:00",
+      "completed_at": "2026-05-01T23:27:17.914512+02:00",
+      "elapsed_minutes": 4
+    },
+    "t-cgroup-v2-usage-metrics": {
+      "status": "done",
+      "path": "",
+      "owner": "claude-code",
+      "evidence": [
+        "fcbfd1f"
+      ],
+      "started_at": "2026-05-01T23:28:53.483687+02:00",
+      "completed_at": "2026-05-01T23:32:47.967244+02:00",
+      "elapsed_minutes": 3
+    },
+    "t-cli-caps-org-flag": {
+      "status": "done",
+      "path": "",
+      "owner": "claude-code",
+      "evidence": [
+        "72f7c11"
+      ],
+      "started_at": "2026-05-01T20:33:31.233277+02:00",
+      "completed_at": "2026-05-01T20:35:34.526376+02:00",
+      "elapsed_minutes": 2
     },
     "t-cli-commands": {
       "status": "done",
       "path": "",
-      "elapsed_minutes": 60,
       "owner": "ai-agent",
-      "started_at": "2026-05-01T08:32:46.253850+00:00",
-      "completed_at": "2026-05-01T08:32:46.253850+00:00"
+      "started_at": "2026-05-01T08:32:46.25385Z",
+      "completed_at": "2026-05-01T08:32:46.25385Z",
+      "elapsed_minutes": 60
+    },
+    "t-cli-plugins-subcommand": {
+      "status": "done",
+      "path": "",
+      "owner": "claude-code",
+      "evidence": [
+        "e74db10"
+      ],
+      "started_at": "2026-05-01T21:05:09.431814+02:00",
+      "completed_at": "2026-05-01T21:12:24.650686+02:00",
+      "elapsed_minutes": 7
+    },
+    "t-cli-revert-command": {
+      "status": "done",
+      "path": "",
+      "owner": "ai-agent",
+      "started_at": "2026-05-01T13:09:10.065Z",
+      "completed_at": "2026-05-01T13:09:10.065Z",
+      "elapsed_minutes": 90
     },
     "t-config-env": {
       "status": "done",
       "path": "",
-      "elapsed_minutes": 60,
       "owner": "ai-agent",
-      "started_at": "2026-05-01T08:32:46.253850+00:00",
-      "completed_at": "2026-05-01T08:32:46.253850+00:00"
+      "started_at": "2026-05-01T08:32:46.25385Z",
+      "completed_at": "2026-05-01T08:32:46.25385Z",
+      "elapsed_minutes": 60
     },
     "t-domain-types": {
       "status": "done",
       "path": "",
-      "elapsed_minutes": 60,
       "owner": "ai-agent",
-      "started_at": "2026-05-01T08:32:46.253850+00:00",
-      "completed_at": "2026-05-01T08:32:46.253850+00:00"
+      "started_at": "2026-05-01T08:32:46.25385Z",
+      "completed_at": "2026-05-01T08:32:46.25385Z",
+      "elapsed_minutes": 60
     },
     "t-executor-dryrun": {
       "status": "done",
       "path": "",
-      "elapsed_minutes": 60,
       "owner": "ai-agent",
-      "started_at": "2026-05-01T08:32:46.253850+00:00",
-      "completed_at": "2026-05-01T08:32:46.253850+00:00"
+      "started_at": "2026-05-01T08:32:46.25385Z",
+      "completed_at": "2026-05-01T08:32:46.25385Z",
+      "elapsed_minutes": 60
     },
     "t-executor-execute": {
       "status": "done",
       "path": "",
-      "elapsed_minutes": 60,
       "owner": "ai-agent",
-      "started_at": "2026-05-01T08:32:46.253850+00:00",
-      "completed_at": "2026-05-01T08:32:46.253850+00:00"
+      "started_at": "2026-05-01T08:32:46.25385Z",
+      "completed_at": "2026-05-01T08:32:46.25385Z",
+      "elapsed_minutes": 60
     },
     "t-gitignore-editorconfig": {
       "status": "done",
       "path": "",
-      "elapsed_minutes": 60,
       "owner": "ai-agent",
-      "started_at": "2026-05-01T08:32:46.253850+00:00",
-      "completed_at": "2026-05-01T08:32:46.253850+00:00"
+      "started_at": "2026-05-01T08:32:46.25385Z",
+      "completed_at": "2026-05-01T08:32:46.25385Z",
+      "elapsed_minutes": 60
     },
     "t-go-client": {
       "status": "done",
       "path": "",
-      "elapsed_minutes": 60,
       "owner": "ai-agent",
-      "started_at": "2026-05-01T08:32:46.253850+00:00",
-      "completed_at": "2026-05-01T08:32:46.253850+00:00"
+      "started_at": "2026-05-01T08:32:46.25385Z",
+      "completed_at": "2026-05-01T08:32:46.25385Z",
+      "elapsed_minutes": 60
+    },
+    "t-handler-calendar-schedule": {
+      "status": "done",
+      "path": "",
+      "owner": "ai-agent",
+      "started_at": "2026-05-01T11:01:33.7832Z",
+      "completed_at": "2026-05-01T11:01:33.7832Z",
+      "elapsed_minutes": 90
+    },
+    "t-handler-github-comment": {
+      "status": "done",
+      "path": "",
+      "owner": "ai-agent",
+      "started_at": "2026-05-01T11:01:33.7832Z",
+      "completed_at": "2026-05-01T11:01:33.7832Z",
+      "elapsed_minutes": 90
+    },
+    "t-handler-github-create-issue": {
+      "status": "done",
+      "path": "",
+      "owner": "ai-agent",
+      "started_at": "2026-05-01T11:01:33.7832Z",
+      "completed_at": "2026-05-01T11:01:33.7832Z",
+      "elapsed_minutes": 90
+    },
+    "t-handler-http-request": {
+      "status": "done",
+      "path": "",
+      "owner": "ai-agent",
+      "started_at": "2026-05-01T10:17:20.595047Z",
+      "completed_at": "2026-05-01T10:17:20.595047Z",
+      "elapsed_minutes": 60
+    },
+    "t-handler-linear-create-issue": {
+      "status": "done",
+      "path": "",
+      "owner": "ai-agent",
+      "started_at": "2026-05-01T11:01:33.7832Z",
+      "completed_at": "2026-05-01T11:01:33.7832Z",
+      "elapsed_minutes": 90
     },
     "t-handler-runner": {
       "status": "done",
       "path": "",
-      "elapsed_minutes": 60,
       "owner": "ai-agent",
-      "started_at": "2026-05-01T08:32:46.253850+00:00",
-      "completed_at": "2026-05-01T08:32:46.253850+00:00"
+      "started_at": "2026-05-01T08:32:46.25385Z",
+      "completed_at": "2026-05-01T08:32:46.25385Z",
+      "elapsed_minutes": 60
     },
     "t-handler-slack-send-message": {
       "status": "done",
       "path": "",
-      "elapsed_minutes": 60,
       "owner": "ai-agent",
-      "started_at": "2026-05-01T08:32:46.253850+00:00",
-      "completed_at": "2026-05-01T08:32:46.253850+00:00"
+      "started_at": "2026-05-01T08:32:46.25385Z",
+      "completed_at": "2026-05-01T08:32:46.25385Z",
+      "elapsed_minutes": 60
     },
     "t-handler-smtp-send-email": {
       "status": "done",
       "path": "",
-      "elapsed_minutes": 60,
       "owner": "ai-agent",
-      "started_at": "2026-05-01T08:32:46.253850+00:00",
-      "completed_at": "2026-05-01T08:32:46.253850+00:00"
+      "started_at": "2026-05-01T08:32:46.25385Z",
+      "completed_at": "2026-05-01T08:32:46.25385Z",
+      "elapsed_minutes": 60
     },
     "t-http-axikernel": {
       "status": "done",
       "path": "",
-      "elapsed_minutes": 60,
       "owner": "ai-agent",
-      "started_at": "2026-05-01T08:32:46.253850+00:00",
-      "completed_at": "2026-05-01T08:32:46.253850+00:00"
+      "started_at": "2026-05-01T08:32:46.25385Z",
+      "completed_at": "2026-05-01T08:32:46.25385Z",
+      "elapsed_minutes": 60
     },
     "t-idempotency-keeper": {
       "status": "done",
       "path": "",
-      "elapsed_minutes": 60,
       "owner": "ai-agent",
-      "started_at": "2026-05-01T08:32:46.253850+00:00",
-      "completed_at": "2026-05-01T08:32:46.253850+00:00"
+      "started_at": "2026-05-01T08:32:46.25385Z",
+      "completed_at": "2026-05-01T08:32:46.25385Z",
+      "elapsed_minutes": 60
     },
     "t-init-go-module": {
       "status": "done",
@@ -141,332 +366,486 @@
     "t-license": {
       "status": "done",
       "path": "",
-      "elapsed_minutes": 60,
       "owner": "ai-agent",
-      "started_at": "2026-05-01T08:32:46.253850+00:00",
-      "completed_at": "2026-05-01T08:32:46.253850+00:00"
+      "started_at": "2026-05-01T08:32:46.25385Z",
+      "completed_at": "2026-05-01T08:32:46.25385Z",
+      "elapsed_minutes": 60
     },
     "t-makefile": {
       "status": "done",
       "path": "",
-      "elapsed_minutes": 60,
       "owner": "ai-agent",
-      "started_at": "2026-05-01T08:32:46.253850+00:00",
-      "completed_at": "2026-05-01T08:32:46.253850+00:00"
+      "started_at": "2026-05-01T08:32:46.25385Z",
+      "completed_at": "2026-05-01T08:32:46.25385Z",
+      "elapsed_minutes": 60
     },
-    "t-observability": {
+    "t-mcp-federation-client": {
       "status": "done",
       "path": "",
-      "elapsed_minutes": 60,
-      "owner": "ai-agent",
-      "started_at": "2026-05-01T08:32:46.253850+00:00",
-      "completed_at": "2026-05-01T08:32:46.253850+00:00"
+      "owner": "claude-code",
+      "evidence": [
+        "6ee0a95"
+      ],
+      "started_at": "2026-05-01T23:44:10.418175+02:00",
+      "completed_at": "2026-05-01T23:46:48.108644+02:00",
+      "elapsed_minutes": 2
     },
-    "t-outcome-emitter": {
+    "t-mcp-federation-config": {
       "status": "done",
       "path": "",
-      "elapsed_minutes": 60,
-      "owner": "ai-agent",
-      "started_at": "2026-05-01T08:32:46.253850+00:00",
-      "completed_at": "2026-05-01T08:32:46.253850+00:00"
+      "owner": "claude-code",
+      "evidence": [
+        "66da73b"
+      ],
+      "started_at": "2026-05-01T23:35:26.020727+02:00",
+      "completed_at": "2026-05-01T23:38:19.549812+02:00",
+      "elapsed_minutes": 2
     },
-    "t-policy-engine-v0": {
+    "t-mcp-federation-failure-handling": {
       "status": "done",
       "path": "",
-      "elapsed_minutes": 60,
-      "owner": "ai-agent",
-      "started_at": "2026-05-01T08:32:46.253850+00:00",
-      "completed_at": "2026-05-01T08:32:46.253850+00:00"
+      "owner": "claude-code",
+      "evidence": [
+        "8c87442"
+      ],
+      "started_at": "2026-05-01T23:51:16.129638+02:00",
+      "completed_at": "2026-05-01T23:55:53.408764+02:00",
+      "elapsed_minutes": 4
     },
-    "t-repository-ports": {
+    "t-mcp-federation-handler": {
       "status": "done",
       "path": "",
-      "elapsed_minutes": 60,
-      "owner": "ai-agent",
-      "started_at": "2026-05-01T08:32:46.253850+00:00",
-      "completed_at": "2026-05-01T08:32:46.253850+00:00"
-    },
-    "t-schema-validator": {
-      "status": "done",
-      "path": "",
-      "elapsed_minutes": 60,
-      "owner": "ai-agent",
-      "started_at": "2026-05-01T08:32:46.253850+00:00",
-      "completed_at": "2026-05-01T08:32:46.253850+00:00"
-    },
-    "t-sqlc-config": {
-      "status": "done",
-      "path": "",
-      "elapsed_minutes": 60,
-      "owner": "ai-agent",
-      "started_at": "2026-05-01T08:32:46.253850+00:00",
-      "completed_at": "2026-05-01T08:32:46.253850+00:00"
-    },
-    "t-store-memory": {
-      "status": "done",
-      "path": "",
-      "elapsed_minutes": 60,
-      "owner": "ai-agent",
-      "started_at": "2026-05-01T08:32:46.253850+00:00",
-      "completed_at": "2026-05-01T08:32:46.253850+00:00"
-    },
-    "t-store-postgres": {
-      "status": "done",
-      "path": "",
-      "elapsed_minutes": 60,
-      "owner": "ai-agent",
-      "started_at": "2026-05-01T08:32:46.253850+00:00",
-      "completed_at": "2026-05-01T08:32:46.253850+00:00"
-    },
-    "t-store-sqlite": {
-      "status": "done",
-      "path": "",
-      "elapsed_minutes": 60,
-      "owner": "ai-agent",
-      "started_at": "2026-05-01T08:32:46.253850+00:00",
-      "completed_at": "2026-05-01T08:32:46.253850+00:00"
-    },
-    "t-store-test-suite": {
-      "status": "done",
-      "path": "",
-      "elapsed_minutes": 60,
-      "owner": "ai-agent",
-      "started_at": "2026-05-01T08:32:46.253850+00:00",
-      "completed_at": "2026-05-01T08:32:46.253850+00:00"
-    },
-    "t-policy-default-deny-mode": {
-      "status": "done",
-      "path": "",
-      "elapsed_minutes": 60,
-      "owner": "ai-agent",
-      "started_at": "2026-05-01T10:17:20.595047+00:00",
-      "completed_at": "2026-05-01T10:17:20.595047+00:00"
-    },
-    "t-policy-priority-ordering": {
-      "status": "done",
-      "path": "",
-      "elapsed_minutes": 60,
-      "owner": "ai-agent",
-      "started_at": "2026-05-01T10:17:20.595047+00:00",
-      "completed_at": "2026-05-01T10:17:20.595047+00:00"
-    },
-    "t-policy-fail-closed-on-repo-error": {
-      "status": "done",
-      "path": "",
-      "elapsed_minutes": 60,
-      "owner": "ai-agent",
-      "started_at": "2026-05-01T10:17:20.595047+00:00",
-      "completed_at": "2026-05-01T10:17:20.595047+00:00"
-    },
-    "t-async-mode-schema-and-port": {
-      "status": "done",
-      "path": "",
-      "elapsed_minutes": 60,
-      "owner": "ai-agent",
-      "started_at": "2026-05-01T10:17:20.595047+00:00",
-      "completed_at": "2026-05-01T10:17:20.595047+00:00"
-    },
-    "t-async-jobs-runner": {
-      "status": "done",
-      "path": "",
-      "elapsed_minutes": 60,
-      "owner": "ai-agent",
-      "started_at": "2026-05-01T10:17:20.595047+00:00",
-      "completed_at": "2026-05-01T10:17:20.595047+00:00"
-    },
-    "t-async-202-response": {
-      "status": "done",
-      "path": "",
-      "elapsed_minutes": 60,
-      "owner": "ai-agent",
-      "started_at": "2026-05-01T10:17:20.595047+00:00",
-      "completed_at": "2026-05-01T10:17:20.595047+00:00"
-    },
-    "t-per-cap-retry-runtime": {
-      "status": "done",
-      "path": "",
-      "elapsed_minutes": 60,
-      "owner": "ai-agent",
-      "started_at": "2026-05-01T10:17:20.595047+00:00",
-      "completed_at": "2026-05-01T10:17:20.595047+00:00"
-    },
-    "t-rate-limiter": {
-      "status": "done",
-      "path": "",
-      "elapsed_minutes": 60,
-      "owner": "ai-agent",
-      "started_at": "2026-05-01T10:17:20.595047+00:00",
-      "completed_at": "2026-05-01T10:17:20.595047+00:00"
-    },
-    "t-policy-throttled-audit-kind": {
-      "status": "done",
-      "path": "",
-      "elapsed_minutes": 60,
-      "owner": "ai-agent",
-      "started_at": "2026-05-01T10:17:20.595047+00:00",
-      "completed_at": "2026-05-01T10:17:20.595047+00:00"
-    },
-    "t-handler-http-request": {
-      "status": "done",
-      "path": "",
-      "elapsed_minutes": 60,
-      "owner": "ai-agent",
-      "started_at": "2026-05-01T10:17:20.595047+00:00",
-      "completed_at": "2026-05-01T10:17:20.595047+00:00"
-    },
-    "t-handler-github-create-issue": {
-      "status": "done",
-      "path": "",
-      "elapsed_minutes": 90,
-      "owner": "ai-agent",
-      "started_at": "2026-05-01T11:01:33.783200+00:00",
-      "completed_at": "2026-05-01T11:01:33.783200+00:00"
-    },
-    "t-handler-github-comment": {
-      "status": "done",
-      "path": "",
-      "elapsed_minutes": 90,
-      "owner": "ai-agent",
-      "started_at": "2026-05-01T11:01:33.783200+00:00",
-      "completed_at": "2026-05-01T11:01:33.783200+00:00"
-    },
-    "t-handler-linear-create-issue": {
-      "status": "done",
-      "path": "",
-      "elapsed_minutes": 90,
-      "owner": "ai-agent",
-      "started_at": "2026-05-01T11:01:33.783200+00:00",
-      "completed_at": "2026-05-01T11:01:33.783200+00:00"
-    },
-    "t-handler-calendar-schedule": {
-      "status": "done",
-      "path": "",
-      "elapsed_minutes": 90,
-      "owner": "ai-agent",
-      "started_at": "2026-05-01T11:01:33.783200+00:00",
-      "completed_at": "2026-05-01T11:01:33.783200+00:00"
-    },
-    "t-vendor-retry-after-header": {
-      "status": "done",
-      "path": "",
-      "elapsed_minutes": 90,
-      "owner": "ai-agent",
-      "started_at": "2026-05-01T11:01:33.783200+00:00",
-      "completed_at": "2026-05-01T11:01:33.783200+00:00"
-    },
-    "t-async-webhook-callback": {
-      "status": "done",
-      "path": "",
-      "elapsed_minutes": 90,
-      "owner": "ai-agent",
-      "started_at": "2026-05-01T11:01:33.783200+00:00",
-      "completed_at": "2026-05-01T11:01:33.783200+00:00"
-    },
-    "t-plugin-handler-abi": {
-      "status": "done",
-      "path": "",
-      "elapsed_minutes": 90,
-      "owner": "ai-agent",
-      "started_at": "2026-05-01T13:14:51.491248+00:00",
-      "completed_at": "2026-05-01T13:14:51.491248+00:00"
-    },
-    "t-plugin-on-disk-discovery": {
-      "status": "pending",
-      "path": "",
-      "elapsed_minutes": 0
-    },
-    "t-plugin-signature-verification": {
-      "status": "pending",
-      "path": "",
-      "elapsed_minutes": 0
-    },
-    "t-plugin-resource-sandbox": {
-      "status": "pending",
-      "path": "",
-      "elapsed_minutes": 0
+      "owner": "claude-code",
+      "evidence": [
+        "b0243fd"
+      ],
+      "started_at": "2026-05-01T23:47:35.694089+02:00",
+      "completed_at": "2026-05-01T23:49:36.661082+02:00",
+      "elapsed_minutes": 2
     },
     "t-mcp-server-bootstrap": {
       "status": "done",
       "path": "",
-      "elapsed_minutes": 90,
       "owner": "ai-agent",
-      "started_at": "2026-05-01T10:45:09.126367+00:00",
-      "completed_at": "2026-05-01T10:45:09.126367+00:00"
+      "started_at": "2026-05-01T10:45:09.126367Z",
+      "completed_at": "2026-05-01T10:45:09.126367Z",
+      "elapsed_minutes": 90
+    },
+    "t-mcp-tenant-list-caps": {
+      "status": "done",
+      "path": "",
+      "owner": "claude-code",
+      "evidence": [
+        "82abcab"
+      ],
+      "started_at": "2026-05-01T20:36:05.730863+02:00",
+      "completed_at": "2026-05-01T20:57:01.679739+02:00",
+      "elapsed_minutes": 20
     },
     "t-mcp-tool-discovery": {
       "status": "done",
       "path": "",
-      "elapsed_minutes": 60,
       "owner": "ai-agent",
-      "started_at": "2026-05-01T13:01:38.077882+00:00",
-      "completed_at": "2026-05-01T13:01:38.077882+00:00"
+      "started_at": "2026-05-01T13:01:38.077882Z",
+      "completed_at": "2026-05-01T13:01:38.077882Z",
+      "elapsed_minutes": 60
     },
     "t-mcp-tool-execute-dryrun": {
       "status": "done",
       "path": "",
-      "elapsed_minutes": 60,
       "owner": "ai-agent",
-      "started_at": "2026-05-01T13:01:38.077882+00:00",
-      "completed_at": "2026-05-01T13:01:38.077882+00:00"
+      "started_at": "2026-05-01T13:01:38.077882Z",
+      "completed_at": "2026-05-01T13:01:38.077882Z",
+      "elapsed_minutes": 60
     },
-    "t-tenant-scope-hierarchy": {
+    "t-observability": {
       "status": "done",
       "path": "",
-      "elapsed_minutes": 90,
       "owner": "ai-agent",
-      "started_at": "2026-05-01T13:14:51.491248+00:00",
-      "completed_at": "2026-05-01T13:14:51.491248+00:00"
-    },
-    "t-tenant-audit-retention": {
-      "status": "pending",
-      "path": "",
-      "elapsed_minutes": 0
-    },
-    "t-tenant-private-capabilities": {
-      "status": "pending",
-      "path": "",
-      "elapsed_minutes": 0
-    },
-    "t-capability-compensate": {
-      "status": "done",
-      "path": "",
-      "elapsed_minutes": 90,
-      "owner": "ai-agent",
-      "started_at": "2026-05-01T13:09:10.065000+00:00",
-      "completed_at": "2026-05-01T13:09:10.065000+00:00"
-    },
-    "t-cli-revert-command": {
-      "status": "done",
-      "path": "",
-      "elapsed_minutes": 90,
-      "owner": "ai-agent",
-      "started_at": "2026-05-01T13:09:10.065000+00:00",
-      "completed_at": "2026-05-01T13:09:10.065000+00:00"
-    },
-    "t-audit-export-json-csv": {
-      "status": "done",
-      "path": "",
-      "elapsed_minutes": 90,
-      "owner": "ai-agent",
-      "started_at": "2026-05-01T13:06:41.574263+00:00",
-      "completed_at": "2026-05-01T13:06:41.574263+00:00"
-    },
-    "t-audit-pii-redaction": {
-      "status": "done",
-      "path": "",
-      "elapsed_minutes": 90,
-      "owner": "ai-agent",
-      "started_at": "2026-05-01T13:06:41.574263+00:00",
-      "completed_at": "2026-05-01T13:06:41.574263+00:00"
+      "started_at": "2026-05-01T08:32:46.25385Z",
+      "completed_at": "2026-05-01T08:32:46.25385Z",
+      "elapsed_minutes": 60
     },
     "t-org-dashboards": {
       "status": "done",
       "path": "",
-      "elapsed_minutes": 75,
       "owner": "ai-agent",
-      "started_at": "2026-05-01T13:12:21.925111+00:00",
-      "completed_at": "2026-05-01T13:12:21.925111+00:00"
+      "started_at": "2026-05-01T13:12:21.925111Z",
+      "completed_at": "2026-05-01T13:12:21.925111Z",
+      "elapsed_minutes": 75
+    },
+    "t-otel-executor-spans": {
+      "status": "done",
+      "path": "",
+      "owner": "claude-code",
+      "evidence": [
+        "4ad9a74"
+      ],
+      "started_at": "2026-05-01T22:11:50.748041+02:00",
+      "completed_at": "2026-05-01T22:20:13.323534+02:00",
+      "elapsed_minutes": 8
+    },
+    "t-otel-handler-propagation": {
+      "status": "done",
+      "path": "",
+      "owner": "claude-code",
+      "evidence": [
+        "216aa87"
+      ],
+      "started_at": "2026-05-01T22:22:05.31009+02:00",
+      "completed_at": "2026-05-01T22:28:29.738535+02:00",
+      "elapsed_minutes": 6
+    },
+    "t-otel-mcp-spans": {
+      "status": "done",
+      "path": "",
+      "owner": "claude-code",
+      "evidence": [
+        "fb47adf"
+      ],
+      "started_at": "2026-05-01T22:30:08.879707+02:00",
+      "completed_at": "2026-05-01T22:32:06.412105+02:00",
+      "elapsed_minutes": 1
+    },
+    "t-otel-tracer-bootstrap": {
+      "status": "done",
+      "path": "",
+      "owner": "claude-code",
+      "evidence": [
+        "b91eade"
+      ],
+      "started_at": "2026-05-01T22:00:29.225949+02:00",
+      "completed_at": "2026-05-01T22:08:58.512744+02:00",
+      "elapsed_minutes": 8
+    },
+    "t-outcome-emitter": {
+      "status": "done",
+      "path": "",
+      "owner": "ai-agent",
+      "started_at": "2026-05-01T08:32:46.25385Z",
+      "completed_at": "2026-05-01T08:32:46.25385Z",
+      "elapsed_minutes": 60
+    },
+    "t-per-cap-retry-runtime": {
+      "status": "done",
+      "path": "",
+      "owner": "ai-agent",
+      "started_at": "2026-05-01T10:17:20.595047Z",
+      "completed_at": "2026-05-01T10:17:20.595047Z",
+      "elapsed_minutes": 60
+    },
+    "t-plugin-fsnotify-watch": {
+      "status": "done",
+      "path": "",
+      "owner": "claude-code",
+      "evidence": [
+        "e253093"
+      ],
+      "started_at": "2026-05-01T20:57:44.650791+02:00",
+      "completed_at": "2026-05-01T21:02:22.684853+02:00",
+      "elapsed_minutes": 4
+    },
+    "t-plugin-graceful-rollover": {
+      "status": "done",
+      "path": "",
+      "owner": "claude-code",
+      "evidence": [
+        "aed8a1f"
+      ],
+      "started_at": "2026-05-01T21:22:57.753229+02:00",
+      "completed_at": "2026-05-01T21:31:12.378274+02:00",
+      "elapsed_minutes": 8
+    },
+    "t-plugin-handler-abi": {
+      "status": "done",
+      "path": "",
+      "owner": "ai-agent",
+      "started_at": "2026-05-01T13:14:51.491248Z",
+      "completed_at": "2026-05-01T13:14:51.491248Z",
+      "elapsed_minutes": 90
+    },
+    "t-plugin-load-metrics": {
+      "status": "done",
+      "path": "",
+      "owner": "claude-code",
+      "evidence": [
+        "b77dcb2"
+      ],
+      "started_at": "2026-05-01T19:52:50.604249+02:00",
+      "completed_at": "2026-05-01T19:57:09.295712+02:00",
+      "elapsed_minutes": 4
+    },
+    "t-plugin-loader-strict-mode": {
+      "status": "done",
+      "path": "",
+      "owner": "claude-code",
+      "evidence": [
+        "b77dcb2"
+      ],
+      "started_at": "2026-05-01T19:52:44.233927+02:00",
+      "completed_at": "2026-05-01T19:57:04.365058+02:00",
+      "elapsed_minutes": 4
+    },
+    "t-plugin-on-disk-discovery": {
+      "status": "done",
+      "path": "",
+      "owner": "claude-code",
+      "evidence": [
+        "ceefe8b"
+      ],
+      "started_at": "2026-05-01T15:20:51.241001+02:00",
+      "completed_at": "2026-05-01T15:25:40.963753+02:00",
+      "elapsed_minutes": 4
+    },
+    "t-plugin-pipeline-loader": {
+      "status": "done",
+      "path": "",
+      "owner": "claude-code",
+      "evidence": [
+        "1224c14"
+      ],
+      "started_at": "2026-05-01T16:27:17.508838+02:00",
+      "completed_at": "2026-05-01T19:50:49.993714+02:00",
+      "elapsed_minutes": 203
+    },
+    "t-plugin-resource-sandbox": {
+      "status": "done",
+      "path": "",
+      "owner": "claude-code",
+      "evidence": [
+        "274c343"
+      ],
+      "started_at": "2026-05-01T15:58:32.154249+02:00",
+      "completed_at": "2026-05-01T16:03:13.393246+02:00",
+      "elapsed_minutes": 4
+    },
+    "t-plugin-sighup-rescan": {
+      "status": "done",
+      "path": "",
+      "owner": "claude-code",
+      "evidence": [
+        "d716083"
+      ],
+      "started_at": "2026-05-01T21:02:52.573654+02:00",
+      "completed_at": "2026-05-01T21:04:16.679403+02:00",
+      "elapsed_minutes": 1
+    },
+    "t-plugin-signature-verification": {
+      "status": "done",
+      "path": "",
+      "owner": "claude-code",
+      "evidence": [
+        "a9a032b"
+      ],
+      "started_at": "2026-05-01T15:53:24.11083+02:00",
+      "completed_at": "2026-05-01T15:57:00.88275+02:00",
+      "elapsed_minutes": 3
+    },
+    "t-pluginhost-binary": {
+      "status": "done",
+      "path": "",
+      "owner": "claude-code",
+      "evidence": [
+        "63feb0c"
+      ],
+      "started_at": "2026-05-01T21:32:23.578901+02:00",
+      "completed_at": "2026-05-01T21:38:40.235576+02:00",
+      "elapsed_minutes": 6
+    },
+    "t-pluginhost-crash-recovery": {
+      "status": "done",
+      "path": "",
+      "owner": "claude-code",
+      "evidence": [
+        "85e6f67"
+      ],
+      "started_at": "2026-05-01T21:44:08.876205+02:00",
+      "completed_at": "2026-05-01T21:49:38.870258+02:00",
+      "elapsed_minutes": 5
+    },
+    "t-pluginhost-resource-limits": {
+      "status": "done",
+      "path": "",
+      "owner": "claude-code",
+      "evidence": [
+        "3b20318"
+      ],
+      "started_at": "2026-05-01T21:39:28.38045+02:00",
+      "completed_at": "2026-05-01T21:43:11.55034+02:00",
+      "elapsed_minutes": 3
+    },
+    "t-policy-default-deny-mode": {
+      "status": "done",
+      "path": "",
+      "owner": "ai-agent",
+      "started_at": "2026-05-01T10:17:20.595047Z",
+      "completed_at": "2026-05-01T10:17:20.595047Z",
+      "elapsed_minutes": 60
+    },
+    "t-policy-engine-v0": {
+      "status": "done",
+      "path": "",
+      "owner": "ai-agent",
+      "started_at": "2026-05-01T08:32:46.25385Z",
+      "completed_at": "2026-05-01T08:32:46.25385Z",
+      "elapsed_minutes": 60
+    },
+    "t-policy-fail-closed-on-repo-error": {
+      "status": "done",
+      "path": "",
+      "owner": "ai-agent",
+      "started_at": "2026-05-01T10:17:20.595047Z",
+      "completed_at": "2026-05-01T10:17:20.595047Z",
+      "elapsed_minutes": 60
+    },
+    "t-policy-priority-ordering": {
+      "status": "done",
+      "path": "",
+      "owner": "ai-agent",
+      "started_at": "2026-05-01T10:17:20.595047Z",
+      "completed_at": "2026-05-01T10:17:20.595047Z",
+      "elapsed_minutes": 60
+    },
+    "t-policy-throttled-audit-kind": {
+      "status": "done",
+      "path": "",
+      "owner": "ai-agent",
+      "started_at": "2026-05-01T10:17:20.595047Z",
+      "completed_at": "2026-05-01T10:17:20.595047Z",
+      "elapsed_minutes": 60
+    },
+    "t-rate-limiter": {
+      "status": "done",
+      "path": "",
+      "owner": "ai-agent",
+      "started_at": "2026-05-01T10:17:20.595047Z",
+      "completed_at": "2026-05-01T10:17:20.595047Z",
+      "elapsed_minutes": 60
+    },
+    "t-repository-ports": {
+      "status": "done",
+      "path": "",
+      "owner": "ai-agent",
+      "started_at": "2026-05-01T08:32:46.25385Z",
+      "completed_at": "2026-05-01T08:32:46.25385Z",
+      "elapsed_minutes": 60
+    },
+    "t-schema-changelog-endpoint": {
+      "status": "done",
+      "path": "",
+      "owner": "claude-code",
+      "evidence": [
+        "2824fbf"
+      ],
+      "started_at": "2026-05-01T22:45:01.152654+02:00",
+      "completed_at": "2026-05-01T22:49:24.327546+02:00",
+      "elapsed_minutes": 4
+    },
+    "t-schema-compat-checker": {
+      "status": "done",
+      "path": "",
+      "owner": "claude-code",
+      "evidence": [
+        "cc232af"
+      ],
+      "started_at": "2026-05-01T22:37:35.576269+02:00",
+      "completed_at": "2026-05-01T22:44:14.884522+02:00",
+      "elapsed_minutes": 6
+    },
+    "t-schema-validator": {
+      "status": "done",
+      "path": "",
+      "owner": "ai-agent",
+      "started_at": "2026-05-01T08:32:46.25385Z",
+      "completed_at": "2026-05-01T08:32:46.25385Z",
+      "elapsed_minutes": 60
+    },
+    "t-schema-version-fields": {
+      "status": "done",
+      "path": "",
+      "owner": "claude-code",
+      "started_at": "2026-05-01T22:32:57.094173+02:00",
+      "completed_at": "2026-05-01T22:37:26.076236+02:00",
+      "elapsed_minutes": 4
+    },
+    "t-sqlc-config": {
+      "status": "done",
+      "path": "",
+      "owner": "ai-agent",
+      "started_at": "2026-05-01T08:32:46.25385Z",
+      "completed_at": "2026-05-01T08:32:46.25385Z",
+      "elapsed_minutes": 60
+    },
+    "t-store-memory": {
+      "status": "done",
+      "path": "",
+      "owner": "ai-agent",
+      "started_at": "2026-05-01T08:32:46.25385Z",
+      "completed_at": "2026-05-01T08:32:46.25385Z",
+      "elapsed_minutes": 60
+    },
+    "t-store-postgres": {
+      "status": "done",
+      "path": "",
+      "owner": "ai-agent",
+      "started_at": "2026-05-01T08:32:46.25385Z",
+      "completed_at": "2026-05-01T08:32:46.25385Z",
+      "elapsed_minutes": 60
+    },
+    "t-store-sqlite": {
+      "status": "done",
+      "path": "",
+      "owner": "ai-agent",
+      "started_at": "2026-05-01T08:32:46.25385Z",
+      "completed_at": "2026-05-01T08:32:46.25385Z",
+      "elapsed_minutes": 60
+    },
+    "t-store-test-suite": {
+      "status": "done",
+      "path": "",
+      "owner": "ai-agent",
+      "started_at": "2026-05-01T08:32:46.25385Z",
+      "completed_at": "2026-05-01T08:32:46.25385Z",
+      "elapsed_minutes": 60
+    },
+    "t-tenant-audit-retention": {
+      "status": "done",
+      "path": "",
+      "owner": "claude-code",
+      "evidence": [
+        "9e69ceb"
+      ],
+      "started_at": "2026-05-01T15:39:28.855037+02:00",
+      "completed_at": "2026-05-01T15:51:55.309881+02:00",
+      "elapsed_minutes": 12
+    },
+    "t-tenant-private-capabilities": {
+      "status": "done",
+      "path": "",
+      "owner": "claude-code",
+      "evidence": [
+        "c93fd12"
+      ],
+      "started_at": "2026-05-01T15:37:47.939895+02:00",
+      "completed_at": "2026-05-01T15:37:51.461039+02:00",
+      "elapsed_minutes": 0
+    },
+    "t-tenant-scope-hierarchy": {
+      "status": "done",
+      "path": "",
+      "owner": "ai-agent",
+      "started_at": "2026-05-01T13:14:51.491248Z",
+      "completed_at": "2026-05-01T13:14:51.491248Z",
+      "elapsed_minutes": 90
+    },
+    "t-vendor-retry-after-header": {
+      "status": "done",
+      "path": "",
+      "owner": "ai-agent",
+      "started_at": "2026-05-01T11:01:33.7832Z",
+      "completed_at": "2026-05-01T11:01:33.7832Z",
+      "elapsed_minutes": 90
     }
   },
-  "updated_at": "2026-04-30T19:38:40.131182+02:00"
+  "updated_at": "2026-05-01T23:55:53.408764+02:00"
 }
