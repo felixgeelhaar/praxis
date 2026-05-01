@@ -432,6 +432,8 @@ func (a *auditAdapter) Append(ctx context.Context, e domain.AuditEvent) error {
 		Kind:       e.Kind,
 		Capability: cap,
 		CallerType: callerType,
+		OrgID:      e.OrgID,
+		TeamID:     e.TeamID,
 		Detail:     mustJSON(e.Detail),
 		CreatedAt:  formatTS(e.CreatedAt),
 	})
@@ -444,7 +446,17 @@ func (a *auditAdapter) ListForAction(ctx context.Context, actionID string) ([]do
 	}
 	out := make([]domain.AuditEvent, 0, len(rows))
 	for _, r := range rows {
-		out = append(out, auditFromRow(r))
+		out = append(out, auditFromRow(sqlcgen.AuditEvent{
+			ID:         r.ID,
+			ActionID:   r.ActionID,
+			Kind:       r.Kind,
+			Capability: r.Capability,
+			CallerType: r.CallerType,
+			OrgID:      r.OrgID,
+			TeamID:     r.TeamID,
+			Detail:     r.Detail,
+			CreatedAt:  r.CreatedAt,
+		}))
 	}
 	return out, nil
 }
@@ -456,6 +468,9 @@ func (a *auditAdapter) Search(ctx context.Context, q ports.AuditQuery) ([]domain
 	}
 	if q.CallerType != "" {
 		params.CallerType = sql.NullString{String: q.CallerType, Valid: true}
+	}
+	if q.OrgID != "" {
+		params.OrgID = sql.NullString{String: q.OrgID, Valid: true}
 	}
 	if q.From > 0 {
 		params.FromTs = sql.NullString{String: formatTS(time.Unix(q.From, 0)), Valid: true}
@@ -469,9 +484,26 @@ func (a *auditAdapter) Search(ctx context.Context, q ports.AuditQuery) ([]domain
 	}
 	out := make([]domain.AuditEvent, 0, len(rows))
 	for _, r := range rows {
-		out = append(out, auditFromRow(r))
+		out = append(out, auditFromRow(sqlcgen.AuditEvent{
+			ID:         r.ID,
+			ActionID:   r.ActionID,
+			Kind:       r.Kind,
+			Capability: r.Capability,
+			CallerType: r.CallerType,
+			OrgID:      r.OrgID,
+			TeamID:     r.TeamID,
+			Detail:     r.Detail,
+			CreatedAt:  r.CreatedAt,
+		}))
 	}
 	return out, nil
+}
+
+func (a *auditAdapter) PurgeBefore(ctx context.Context, orgID string, before int64) (int64, error) {
+	return a.q.PurgeAuditBefore(ctx, sqlcgen.PurgeAuditBeforeParams{
+		Before: formatTS(time.Unix(before, 0)),
+		OrgID:  orgID,
+	})
 }
 
 func auditFromRow(r sqlcgen.AuditEvent) domain.AuditEvent {
@@ -480,6 +512,8 @@ func auditFromRow(r sqlcgen.AuditEvent) domain.AuditEvent {
 		ID:        r.ID,
 		ActionID:  r.ActionID,
 		Kind:      r.Kind,
+		OrgID:     r.OrgID,
+		TeamID:    r.TeamID,
 		Detail:    parseJSONMap(r.Detail),
 		CreatedAt: created,
 	}

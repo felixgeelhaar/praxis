@@ -239,6 +239,9 @@ func (r *auditRepo) Search(_ context.Context, q ports.AuditQuery) ([]domain.Audi
 				continue
 			}
 		}
+		if q.OrgID != "" && e.OrgID != q.OrgID {
+			continue
+		}
 		if q.From > 0 && e.CreatedAt.Unix() < q.From {
 			continue
 		}
@@ -249,6 +252,22 @@ func (r *auditRepo) Search(_ context.Context, q ports.AuditQuery) ([]domain.Audi
 	}
 	sort.SliceStable(out, func(i, j int) bool { return out[i].CreatedAt.Before(out[j].CreatedAt) })
 	return out, nil
+}
+
+func (r *auditRepo) PurgeBefore(_ context.Context, orgID string, before int64) (int64, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	kept := r.events[:0]
+	var deleted int64
+	for _, e := range r.events {
+		if e.CreatedAt.Unix() < before && e.OrgID == orgID {
+			deleted++
+			continue
+		}
+		kept = append(kept, e)
+	}
+	r.events = append([]domain.AuditEvent(nil), kept...)
+	return deleted, nil
 }
 
 // --- policy ---

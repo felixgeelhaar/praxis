@@ -16,16 +16,17 @@ type Querier interface {
 	GetAction(ctx context.Context, id string) (GetActionRow, error)
 	GetCapability(ctx context.Context, name string) (Capability, error)
 	ListActionsPaged(ctx context.Context, limit int32) ([]ListActionsPagedRow, error)
-	ListAuditForAction(ctx context.Context, actionID string) ([]AuditEvent, error)
+	ListAuditForAction(ctx context.Context, actionID string) ([]ListAuditForActionRow, error)
 	ListCapabilities(ctx context.Context) ([]Capability, error)
 	ListPendingAsync(ctx context.Context, limit int32) ([]ListPendingAsyncRow, error)
 	ListPolicyRules(ctx context.Context) ([]PolicyRule, error)
 	LookupIdempotency(ctx context.Context, key string) (IdempotencyKey, error)
 	MarkOutcomeDelivered(ctx context.Context, arg MarkOutcomeDeliveredParams) error
 	NextOutcomeBatch(ctx context.Context, arg NextOutcomeBatchParams) ([]OutcomeOutbox, error)
+	PurgeAuditBefore(ctx context.Context, arg PurgeAuditBeforeParams) (int64, error)
 	PutActionResult(ctx context.Context, arg PutActionResultParams) error
 	RememberIdempotency(ctx context.Context, arg RememberIdempotencyParams) error
-	SearchAuditEvents(ctx context.Context, arg SearchAuditEventsParams) ([]AuditEvent, error)
+	SearchAuditEvents(ctx context.Context, arg SearchAuditEventsParams) ([]SearchAuditEventsRow, error)
 	UpdateActionStatus(ctx context.Context, arg UpdateActionStatusParams) error
 	UpsertAction(ctx context.Context, arg UpsertActionParams) error
 	UpsertCapability(ctx context.Context, arg UpsertCapabilityParams) error

@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/felixgeelhaar/bolt"
+	"github.com/felixgeelhaar/praxis/internal/audit"
 	"github.com/felixgeelhaar/praxis/internal/capability"
 	"github.com/felixgeelhaar/praxis/internal/domain"
 	"github.com/felixgeelhaar/praxis/internal/executor"
@@ -49,9 +50,12 @@ func newTestServer(t *testing.T, token string) *httptest.Server {
 	exec := executor.New(logger, reg, pol, idem, runner, schema.New(),
 		repos.Action, repos.Audit, emitter)
 
+	auditSvc := audit.New(repos.Audit)
+
 	mux := newMux(kernelDeps{
 		logger: logger, exec: exec, registry: reg, repos: repos,
-		emitter: emitter, apiToken: token,
+		auditSvc: auditSvc,
+		emitter:  emitter, apiToken: token,
 	}, &metrics{})
 
 	return httptest.NewServer(mux)

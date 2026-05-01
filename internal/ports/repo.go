@@ -31,11 +31,19 @@ type AuditRepo interface {
 	Append(ctx context.Context, e domain.AuditEvent) error
 	ListForAction(ctx context.Context, actionID string) ([]domain.AuditEvent, error)
 	Search(ctx context.Context, q AuditQuery) ([]domain.AuditEvent, error)
+	// PurgeBefore deletes audit rows created strictly before `before`
+	// whose org_id is exactly orgID. An empty orgID targets only events
+	// that were stamped with no org (anonymous / system events). Always
+	// exact-match — there is no global cross-tenant purge through this
+	// port, so a misconfigured retention policy cannot leak between
+	// tenants. Returns the number of rows deleted. Phase 3 M3.3.
+	PurgeBefore(ctx context.Context, orgID string, before int64) (int64, error)
 }
 
 type AuditQuery struct {
 	Capability string
 	CallerType string
+	OrgID      string // Phase 3 M3.3: tenant scope; "" matches any org
 	From, To   int64
 }
 

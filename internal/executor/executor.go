@@ -478,6 +478,8 @@ func (e *Executor) appendAudit(ctx context.Context, a domain.Action, kind string
 		ID:        id,
 		ActionID:  a.ID,
 		Kind:      kind,
+		OrgID:     a.Caller.OrgID,
+		TeamID:    a.Caller.TeamID,
 		Detail:    detail,
 		CreatedAt: e.now(),
 	}); err != nil {

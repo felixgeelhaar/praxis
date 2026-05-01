@@ -36,6 +36,8 @@ type AuditEvent struct {
 	CallerType string `json:"caller_type"`
 	Detail     string `json:"detail"`
 	CreatedAt  string `json:"created_at"`
+	OrgID      string `json:"org_id"`
+	TeamID     string `json:"team_id"`
 }
 
 type Capability struct {

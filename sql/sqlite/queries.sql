@@ -63,21 +63,27 @@ ORDER BY created_at DESC
 LIMIT ?;
 
 -- name: AppendAuditEvent :exec
-INSERT INTO audit_events (id, action_id, kind, capability, caller_type, detail, created_at)
-VALUES (?, ?, ?, ?, ?, ?, ?);
+INSERT INTO audit_events (id, action_id, kind, capability, caller_type, org_id, team_id, detail, created_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 -- name: ListAuditForAction :many
-SELECT id, action_id, kind, capability, caller_type, detail, created_at
+SELECT id, action_id, kind, capability, caller_type, org_id, team_id, detail, created_at
 FROM audit_events WHERE action_id = ? ORDER BY created_at;
 
 -- name: SearchAuditEvents :many
-SELECT id, action_id, kind, capability, caller_type, detail, created_at
+SELECT id, action_id, kind, capability, caller_type, org_id, team_id, detail, created_at
 FROM audit_events
 WHERE (sqlc.narg('capability')  IS NULL OR capability  = sqlc.narg('capability'))
   AND (sqlc.narg('caller_type') IS NULL OR caller_type = sqlc.narg('caller_type'))
+  AND (sqlc.narg('org_id')      IS NULL OR org_id      = sqlc.narg('org_id'))
   AND (sqlc.narg('from_ts')     IS NULL OR created_at >= sqlc.narg('from_ts'))
   AND (sqlc.narg('to_ts')       IS NULL OR created_at <= sqlc.narg('to_ts'))
 ORDER BY created_at;
+
+-- name: PurgeAuditBefore :execrows
+DELETE FROM audit_events
+WHERE created_at < sqlc.arg('before')
+  AND org_id = sqlc.arg('org_id');
 
 -- name: LookupIdempotency :one
 SELECT key, action_id, result, expires_at, created_at

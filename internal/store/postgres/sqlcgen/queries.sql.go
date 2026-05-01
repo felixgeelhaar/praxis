@@ -12,8 +12,8 @@ import (
 )
 
 const appendAuditEvent = `-- name: AppendAuditEvent :exec
-INSERT INTO audit_events (id, action_id, kind, capability, caller_type, detail, created_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7)
+INSERT INTO audit_events (id, action_id, kind, capability, caller_type, org_id, team_id, detail, created_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 `
 
 type AppendAuditEventParams struct {
@@ -22,6 +22,8 @@ type AppendAuditEventParams struct {
 	Kind       string             `json:"kind"`
 	Capability string             `json:"capability"`
 	CallerType string             `json:"caller_type"`
+	OrgID      string             `json:"org_id"`
+	TeamID     string             `json:"team_id"`
 	Detail     []byte             `json:"detail"`
 	CreatedAt  pgtype.Timestamptz `json:"created_at"`
 }
@@ -33,6 +35,8 @@ func (q *Queries) AppendAuditEvent(ctx context.Context, arg AppendAuditEventPara
 		arg.Kind,
 		arg.Capability,
 		arg.CallerType,
+		arg.OrgID,
+		arg.TeamID,
 		arg.Detail,
 		arg.CreatedAt,
 	)
@@ -224,25 +228,39 @@ func (q *Queries) ListActionsPaged(ctx context.Context, limit int32) ([]ListActi
 }
 
 const listAuditForAction = `-- name: ListAuditForAction :many
-SELECT id, action_id, kind, capability, caller_type, detail, created_at
+SELECT id, action_id, kind, capability, caller_type, org_id, team_id, detail, created_at
 FROM audit_events WHERE action_id = $1 ORDER BY created_at
 `
 
-func (q *Queries) ListAuditForAction(ctx context.Context, actionID string) ([]AuditEvent, error) {
+type ListAuditForActionRow struct {
+	ID         string             `json:"id"`
+	ActionID   string             `json:"action_id"`
+	Kind       string             `json:"kind"`
+	Capability string             `json:"capability"`
+	CallerType string             `json:"caller_type"`
+	OrgID      string             `json:"org_id"`
+	TeamID     string             `json:"team_id"`
+	Detail     []byte             `json:"detail"`
+	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+}
+
+func (q *Queries) ListAuditForAction(ctx context.Context, actionID string) ([]ListAuditForActionRow, error) {
 	rows, err := q.db.Query(ctx, listAuditForAction, actionID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []AuditEvent
+	var items []ListAuditForActionRow
 	for rows.Next() {
-		var i AuditEvent
+		var i ListAuditForActionRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.ActionID,
 			&i.Kind,
 			&i.Capability,
 			&i.CallerType,
+			&i.OrgID,
+			&i.TeamID,
 			&i.Detail,
 			&i.CreatedAt,
 		); err != nil {
@@ -466,6 +484,25 @@ func (q *Queries) NextOutcomeBatch(ctx context.Context, arg NextOutcomeBatchPara
 	return items, nil
 }
 
+const purgeAuditBefore = `-- name: PurgeAuditBefore :execrows
+DELETE FROM audit_events
+WHERE created_at < $1
+  AND org_id = $2
+`
+
+type PurgeAuditBeforeParams struct {
+	Before pgtype.Timestamptz `json:"before"`
+	OrgID  string             `json:"org_id"`
+}
+
+func (q *Queries) PurgeAuditBefore(ctx context.Context, arg PurgeAuditBeforeParams) (int64, error) {
+	result, err := q.db.Exec(ctx, purgeAuditBefore, arg.Before, arg.OrgID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const putActionResult = `-- name: PutActionResult :exec
 UPDATE actions SET status = $2, result = $3, error = $4, completed_at = $5, updated_at = $6 WHERE id = $1
 `
@@ -520,26 +557,41 @@ func (q *Queries) RememberIdempotency(ctx context.Context, arg RememberIdempoten
 }
 
 const searchAuditEvents = `-- name: SearchAuditEvents :many
-SELECT id, action_id, kind, capability, caller_type, detail, created_at
+SELECT id, action_id, kind, capability, caller_type, org_id, team_id, detail, created_at
 FROM audit_events
 WHERE ($1::TEXT       IS NULL OR capability  = $1)
   AND ($2::TEXT      IS NULL OR caller_type = $2)
-  AND ($3::TIMESTAMPTZ   IS NULL OR created_at >= $3)
-  AND ($4::TIMESTAMPTZ     IS NULL OR created_at <= $4)
+  AND ($3::TEXT           IS NULL OR org_id      = $3)
+  AND ($4::TIMESTAMPTZ   IS NULL OR created_at >= $4)
+  AND ($5::TIMESTAMPTZ     IS NULL OR created_at <= $5)
 ORDER BY created_at
 `
 
 type SearchAuditEventsParams struct {
 	Capability pgtype.Text        `json:"capability"`
 	CallerType pgtype.Text        `json:"caller_type"`
+	OrgID      pgtype.Text        `json:"org_id"`
 	FromTs     pgtype.Timestamptz `json:"from_ts"`
 	ToTs       pgtype.Timestamptz `json:"to_ts"`
 }
 
-func (q *Queries) SearchAuditEvents(ctx context.Context, arg SearchAuditEventsParams) ([]AuditEvent, error) {
+type SearchAuditEventsRow struct {
+	ID         string             `json:"id"`
+	ActionID   string             `json:"action_id"`
+	Kind       string             `json:"kind"`
+	Capability string             `json:"capability"`
+	CallerType string             `json:"caller_type"`
+	OrgID      string             `json:"org_id"`
+	TeamID     string             `json:"team_id"`
+	Detail     []byte             `json:"detail"`
+	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+}
+
+func (q *Queries) SearchAuditEvents(ctx context.Context, arg SearchAuditEventsParams) ([]SearchAuditEventsRow, error) {
 	rows, err := q.db.Query(ctx, searchAuditEvents,
 		arg.Capability,
 		arg.CallerType,
+		arg.OrgID,
 		arg.FromTs,
 		arg.ToTs,
 	)
@@ -547,15 +599,17 @@ func (q *Queries) SearchAuditEvents(ctx context.Context, arg SearchAuditEventsPa
 		return nil, err
 	}
 	defer rows.Close()
-	var items []AuditEvent
+	var items []SearchAuditEventsRow
 	for rows.Next() {
-		var i AuditEvent
+		var i SearchAuditEventsRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.ActionID,
 			&i.Kind,
 			&i.Capability,
 			&i.CallerType,
+			&i.OrgID,
+			&i.TeamID,
 			&i.Detail,
 			&i.CreatedAt,
 		); err != nil {

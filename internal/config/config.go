@@ -25,6 +25,11 @@ type Config struct {
 	OutboxBatchSize int
 	OutboxPollEvery time.Duration
 	PluginDir       string // PRAXIS_PLUGIN_DIR; empty disables plugin discovery
+	// AuditRetention maps OrgID to retention window. The empty key is the
+	// default applied to events whose OrgID is unset. Configured via
+	// PRAXIS_AUDIT_RETENTION as a comma-separated list of "orgID=duration"
+	// pairs (use "*=duration" for the default). Phase 3 M3.3.
+	AuditRetention map[string]time.Duration
 }
 
 // Load reads configuration from the process environment, applying defaults
@@ -45,6 +50,7 @@ func Load() (Config, error) {
 		OutboxBatchSize: getInt("PRAXIS_OUTBOX_BATCH_SIZE", 32),
 		OutboxPollEvery: getDur("PRAXIS_OUTBOX_POLL_EVERY", 2*time.Second),
 		PluginDir:       os.Getenv("PRAXIS_PLUGIN_DIR"),
+		AuditRetention:  parseRetention(os.Getenv("PRAXIS_AUDIT_RETENTION")),
 	}
 
 	switch c.DBType {
@@ -94,4 +100,37 @@ func getDur(key string, def time.Duration) time.Duration {
 		return def
 	}
 	return d
+}
+
+// parseRetention parses PRAXIS_AUDIT_RETENTION. Format is a comma-separated
+// list of "key=duration" pairs where key is an OrgID or "*" for the
+// default applied to events with no OrgID stamp.
+//
+//	"*=720h,org-x=2160h,org-y=0"
+//
+// A value of 0 (or "0s") opts a tenant out of retention sweeps. Malformed
+// pairs are silently dropped — startup never fails on a typo, but the
+// missing pair shows up as no purge for that tenant.
+func parseRetention(raw string) map[string]time.Duration {
+	if strings.TrimSpace(raw) == "" {
+		return nil
+	}
+	out := map[string]time.Duration{}
+	for _, item := range strings.Split(raw, ",") {
+		eq := strings.IndexByte(item, '=')
+		if eq <= 0 {
+			continue
+		}
+		key := strings.TrimSpace(item[:eq])
+		val := strings.TrimSpace(item[eq+1:])
+		if key == "*" {
+			key = ""
+		}
+		d, err := time.ParseDuration(val)
+		if err != nil {
+			continue
+		}
+		out[key] = d
+	}
+	return out
 }

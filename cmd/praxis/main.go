@@ -106,12 +106,13 @@ Environment:
 // --- shared bootstrap ---
 
 type runtime struct {
-	logger  *bolt.Logger
-	cfg     config.Config
-	repos   *ports.Repos
-	exec    *executor.Executor
-	reg     *capability.Registry
-	emitter *outcome.Emitter
+	logger   *bolt.Logger
+	cfg      config.Config
+	repos    *ports.Repos
+	exec     *executor.Executor
+	reg      *capability.Registry
+	auditSvc *audit.Service
+	emitter  *outcome.Emitter
 }
 
 func bootstrap(ctx context.Context) (*runtime, func(), error) {
@@ -149,9 +150,11 @@ func bootstrap(ctx context.Context) (*runtime, func(), error) {
 	})
 	exec := executor.New(logger, registry, pol, idem, runner, validator,
 		repos.Action, repos.Audit, emitter)
+	auditSvc := audit.New(repos.Audit).WithRetention(cfg.AuditRetention)
 
 	return &runtime{
-		logger: logger, cfg: cfg, repos: repos, exec: exec, reg: registry, emitter: emitter,
+		logger: logger, cfg: cfg, repos: repos, exec: exec, reg: registry,
+		auditSvc: auditSvc, emitter: emitter,
 	}, cleanup, nil
 }
 
@@ -202,7 +205,8 @@ func runServe() int {
 	m := &metrics{}
 	mux := newMux(kernelDeps{
 		logger: rt.logger, exec: rt.exec, registry: rt.reg, repos: rt.repos,
-		emitter: rt.emitter, apiToken: rt.cfg.APIToken,
+		auditSvc: rt.auditSvc,
+		emitter:  rt.emitter, apiToken: rt.cfg.APIToken,
 	}, m)
 
 	addr := fmt.Sprintf("%s:%d", rt.cfg.HTTPHost, rt.cfg.HTTPPort)

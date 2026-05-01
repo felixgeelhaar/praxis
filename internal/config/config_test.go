@@ -58,6 +58,45 @@ func TestLoad_PluginDirDefaultsEmpty(t *testing.T) {
 	}
 }
 
+func TestLoad_AuditRetention_DefaultsEmpty(t *testing.T) {
+	t.Setenv("PRAXIS_AUDIT_RETENTION", "")
+	c, err := config.Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if len(c.AuditRetention) != 0 {
+		t.Errorf("AuditRetention=%v want empty", c.AuditRetention)
+	}
+}
+
+func TestLoad_AuditRetention_ParsesPairs(t *testing.T) {
+	t.Setenv("PRAXIS_AUDIT_RETENTION", "*=720h,org-x=2160h,org-y=0s")
+	c, err := config.Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if c.AuditRetention[""] != 720*time.Hour {
+		t.Errorf("default=%v want 720h", c.AuditRetention[""])
+	}
+	if c.AuditRetention["org-x"] != 2160*time.Hour {
+		t.Errorf("org-x=%v want 2160h", c.AuditRetention["org-x"])
+	}
+	if _, ok := c.AuditRetention["org-y"]; !ok {
+		t.Errorf("org-y missing from %v", c.AuditRetention)
+	}
+}
+
+func TestLoad_AuditRetention_DropsMalformed(t *testing.T) {
+	t.Setenv("PRAXIS_AUDIT_RETENTION", "no-equals,key=not-a-duration,*=12h")
+	c, err := config.Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if len(c.AuditRetention) != 1 || c.AuditRetention[""] != 12*time.Hour {
+		t.Errorf("AuditRetention=%v want only default=12h", c.AuditRetention)
+	}
+}
+
 func TestLoad_PluginDirOverride(t *testing.T) {
 	t.Setenv("PRAXIS_PLUGIN_DIR", "/opt/praxis/plugins")
 	c, err := config.Load()

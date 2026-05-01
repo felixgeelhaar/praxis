@@ -40,6 +40,7 @@ type kernelDeps struct {
 	exec     *executor.Executor
 	registry *capability.Registry
 	repos    *ports.Repos
+	auditSvc *audit.Service
 	emitter  *outcome.Emitter
 	apiToken string
 }
@@ -226,6 +227,7 @@ func newMux(deps kernelDeps, m *metrics) *http.ServeMux {
 		q := ports.AuditQuery{
 			Capability: r.URL.Query().Get("capability"),
 			CallerType: r.URL.Query().Get("caller_type"),
+			OrgID:      r.URL.Query().Get("org_id"),
 		}
 		if from := r.URL.Query().Get("from"); from != "" {
 			if v, err := strconv.ParseInt(from, 10, 64); err == nil {
@@ -237,8 +239,13 @@ func newMux(deps kernelDeps, m *metrics) *http.ServeMux {
 				q.To = v
 			}
 		}
-		results, err := deps.repos.Audit.Search(r.Context(), q)
+		caller := callerFromHeaders(r)
+		results, err := deps.auditSvc.SearchForCaller(r.Context(), q, caller)
 		if err != nil {
+			if errors.Is(err, audit.ErrCrossTenantAccess) {
+				writeJSON(w, http.StatusForbidden, errResponse(err.Error()))
+				return
+			}
 			writeJSON(w, http.StatusInternalServerError, errResponse(err.Error()))
 			return
 		}
@@ -284,8 +291,13 @@ func newMux(deps kernelDeps, m *metrics) *http.ServeMux {
 
 	mux.Handle("GET /v1/audit/{action_id}", traced(authed(func(w http.ResponseWriter, r *http.Request) {
 		id := r.PathValue("action_id")
-		results, err := deps.repos.Audit.ListForAction(r.Context(), id)
+		caller := callerFromHeaders(r)
+		results, err := deps.auditSvc.ListForActionByCaller(r.Context(), id, caller)
 		if err != nil {
+			if errors.Is(err, audit.ErrCrossTenantAccess) {
+				writeJSON(w, http.StatusForbidden, errResponse(err.Error()))
+				return
+			}
 			writeJSON(w, http.StatusInternalServerError, errResponse(err.Error()))
 			return
 		}
