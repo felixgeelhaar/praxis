@@ -17,11 +17,15 @@ var ErrTimeout = errors.New("handler timeout")
 var ErrPanic = errors.New("handler panic")
 
 // IsRetryable reports whether an error from a handler should be retried by
-// the caller. Timeouts and 5xx/429-shaped errors are retryable; panics and
-// well-formed 4xx are not.
+// the caller. Timeouts, vendor Retry-After cooldowns, and 5xx/429-shaped
+// errors are retryable; panics and well-formed 4xx are not.
 func IsRetryable(err error) bool {
 	if err == nil {
 		return false
+	}
+	var ra *RetryAfterError
+	if errors.As(err, &ra) {
+		return true
 	}
 	if errors.Is(err, ErrTimeout) {
 		return true
