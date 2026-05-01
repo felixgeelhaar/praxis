@@ -65,6 +65,7 @@ const (
 	ResultABIMismatch    = "abi_mismatch"
 	ResultDlopen         = "dlopen_failed"
 	ResultLoad           = "load_failed"
+	ResultCrashed        = "crashed" // post-load: child process or IPC stream died
 )
 
 // ClassifyError maps a per-plugin error to one of the Result* constants.

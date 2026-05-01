@@ -70,6 +70,16 @@ type Registration struct {
 	Handler    capability.Handler
 }
 
+// Watchable is implemented by Plugin variants whose underlying
+// transport can fail asynchronously — the out-of-process loader is
+// the canonical example. The Manager type-asserts every loaded plugin
+// against Watchable; matching plugins get a goroutine that listens
+// for crash events and triggers capability deregistration. Phase 4
+// out-of-process loader (M3.1).
+type Watchable interface {
+	Watch() <-chan error
+}
+
 // Loader is the runtime interface that registers a plugin's capabilities.
 // Implemented by cmd/praxis at startup; tested in this package against a
 // fake plugin to lock down the contract.
@@ -103,6 +113,13 @@ type LoadHooks struct {
 	// caller can record per-plugin state. Returning the same handler
 	// unchanged is the no-op default.
 	WrapHandler func(manifest Manifest, h capability.Handler) capability.Handler
+
+	// OnLoaded fires once after every Registration has been forwarded
+	// to the Loader, with the plugin instance and the (possibly
+	// wrapped) registrations the runtime now sees. Used by the Manager
+	// to wire Watchable crash detection and record per-plugin
+	// capability names. Phase 4 out-of-process loader.
+	OnLoaded func(p Plugin, regs []Registration)
 }
 
 // LoadWithHooks is Load with an optional WrapHandler hook. Used by the
@@ -132,6 +149,9 @@ func LoadWithHooks(ctx context.Context, p Plugin, loader Loader, hooks *LoadHook
 		if err := loader.Register(r); err != nil {
 			return err
 		}
+	}
+	if hooks != nil && hooks.OnLoaded != nil {
+		hooks.OnLoaded(p, regs)
 	}
 	return nil
 }

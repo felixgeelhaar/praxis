@@ -223,6 +223,7 @@ func loadPlugins(ctx context.Context, logger *bolt.Logger, cfg config.Config, re
 		TrustedKeys: keys,
 		Loader:      &pluginRegistryLoader{reg: reg},
 		Opener:      plugin.DefaultOpener{},
+		Unregister:  reg.Unregister,
 		OnEvent: func(ev plugin.LoadEvent) {
 			m.incPluginLoad(ev.Result)
 			if ev.Result == plugin.ResultSuccess {

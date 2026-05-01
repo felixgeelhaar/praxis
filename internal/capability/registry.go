@@ -96,6 +96,30 @@ func (r *Registry) RegisterTenant(orgID string, h Handler) error {
 	return nil
 }
 
+// Unregister removes a globally-registered handler by name. Returns
+// silently if no handler with that name exists — used by the plugin
+// Manager during crash recovery, where the caller has already lost
+// authoritative state.
+func (r *Registry) Unregister(name string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	delete(r.handlers, name)
+	delete(r.capabilities, name)
+}
+
+// UnregisterTenant removes a tenant-scoped handler by name. Mirrors
+// Unregister for the per-org registries.
+func (r *Registry) UnregisterTenant(orgID, name string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if h, ok := r.tenantHandlers[orgID]; ok {
+		delete(h, name)
+	}
+	if c, ok := r.tenantCapabilities[orgID]; ok {
+		delete(c, name)
+	}
+}
+
 // GetHandler resolves a global handler. Tenant-private handlers are not
 // reachable through this method; use GetHandlerForCaller instead.
 func (r *Registry) GetHandler(name string) (Handler, error) {

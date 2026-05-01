@@ -32,11 +32,18 @@ type LoadEvent struct {
 // ManagerConfig parameters the plugin Manager. Loader, Opener, and Dir
 // are required; TrustedKeys may be empty (the load pipeline will then
 // reject every plugin via ErrNoTrustedKeys, which is the safe default).
+//
+// Unregister, when set, is invoked for every capability name the
+// Manager needs to remove from the runtime registry on a plugin
+// crash. The host wires this to capability.Registry.Unregister so
+// the in-process registry stays consistent with the Manager's
+// snapshot of loaded plugins.
 type ManagerConfig struct {
 	Dir         string
 	TrustedKeys []*ecdsa.PublicKey
 	Loader      Loader
 	Opener      Opener
+	Unregister  func(capName string)
 	OnEvent     func(LoadEvent)
 }
 
@@ -46,11 +53,12 @@ type ManagerConfig struct {
 type Manager struct {
 	cfg ManagerConfig
 
-	mu      sync.RWMutex
-	loaded  map[string]LoadEvent           // pluginName -> last successful load
-	wrapped map[string][]*versionedHandler // pluginName -> active versioned wrappers
-	retired map[string][]*versionedHandler // pluginName -> retired wrappers awaiting drain
-	version atomic.Uint64                  // monotonic per Manager
+	mu       sync.RWMutex
+	loaded   map[string]LoadEvent           // pluginName -> last successful load
+	wrapped  map[string][]*versionedHandler // pluginName -> active versioned wrappers
+	retired  map[string][]*versionedHandler // pluginName -> retired wrappers awaiting drain
+	capNames map[string][]string            // pluginName -> capability names for crash deregistration
+	version  atomic.Uint64                  // monotonic per Manager
 }
 
 // NewManager constructs a Manager. Mandatory fields (Dir, Loader,
@@ -58,10 +66,11 @@ type Manager struct {
 // clear error rather than panicking at construction.
 func NewManager(cfg ManagerConfig) *Manager {
 	return &Manager{
-		cfg:     cfg,
-		loaded:  map[string]LoadEvent{},
-		wrapped: map[string][]*versionedHandler{},
-		retired: map[string][]*versionedHandler{},
+		cfg:      cfg,
+		loaded:   map[string]LoadEvent{},
+		wrapped:  map[string][]*versionedHandler{},
+		retired:  map[string][]*versionedHandler{},
+		capNames: map[string][]string{},
 	}
 }
 
@@ -85,6 +94,7 @@ func (m *Manager) LoadAll(ctx context.Context) (PipelineResult, error) {
 			staging[manifest.Name] = append(staging[manifest.Name], vh)
 			return wrapped
 		},
+		OnLoaded: m.afterLoad,
 	}
 
 	res, err := RunPipeline(ctx, PipelineConfig{
@@ -161,6 +171,7 @@ func (m *Manager) ReloadOne(ctx context.Context, name string) error {
 			staged = append(staged, vh)
 			return wrapped
 		},
+		OnLoaded: m.afterLoad,
 	}
 
 	// Retire the previous wrappers BEFORE the new ones register so a
@@ -226,6 +237,60 @@ func (m *Manager) Drain(ctx context.Context, name string) error {
 		}
 	}
 	return nil
+}
+
+// afterLoad is invoked by LoadWithHooks once each plugin's
+// registrations have reached the runtime registry. The Manager
+// records the plugin's capability names for crash deregistration and,
+// when the plugin exposes a Watch channel, spawns a goroutine that
+// triggers crash recovery on terminal stream errors.
+func (m *Manager) afterLoad(p Plugin, regs []Registration) {
+	manifestName := p.Manifest().Name
+	names := make([]string, 0, len(regs))
+	for _, r := range regs {
+		names = append(names, r.Capability.Name)
+	}
+	m.mu.Lock()
+	m.capNames[manifestName] = names
+	m.mu.Unlock()
+
+	if w, ok := p.(Watchable); ok {
+		go m.watchCrash(manifestName, w)
+	}
+}
+
+// watchCrash blocks on the plugin's Watch channel and, when it fires,
+// runs crash recovery: every capability the plugin contributed is
+// deregistered and a LoadEvent with ResultCrashed is fired. The
+// Manager's loaded snapshot drops the plugin so a subsequent
+// ListCapabilities omits it until the operator reloads.
+func (m *Manager) watchCrash(name string, w Watchable) {
+	err, ok := <-w.Watch()
+	if !ok || err == nil {
+		return
+	}
+	m.mu.Lock()
+	caps := append([]string(nil), m.capNames[name]...)
+	delete(m.capNames, name)
+	delete(m.loaded, name)
+	// Move active wrappers into retired so any in-flight calls finish
+	// on the dead handler (it'll surface the IPC error itself); the
+	// retired bookkeeping prevents Drain from hanging forever later.
+	if active, hasActive := m.wrapped[name]; hasActive {
+		for _, vh := range active {
+			vh.Retire()
+			m.retired[name] = append(m.retired[name], vh)
+		}
+		delete(m.wrapped, name)
+	}
+	m.mu.Unlock()
+
+	if m.cfg.Unregister != nil {
+		for _, capName := range caps {
+			m.cfg.Unregister(capName)
+		}
+	}
+	m.fire(LoadEvent{Name: name, Result: ResultCrashed, Err: err})
 }
 
 // retireAll marks every currently-tracked wrapper retired. Called at

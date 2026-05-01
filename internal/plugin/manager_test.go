@@ -5,6 +5,7 @@ import (
 	"crypto/ecdsa"
 	"errors"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
@@ -168,6 +169,102 @@ func TestManager_DrainBlocksUntilInFlightFinishes(t *testing.T) {
 	case <-drained:
 	case <-time.After(200 * time.Millisecond):
 		t.Fatal("Drain did not return after Execute finished")
+	}
+}
+
+// watchablePlugin is a fake Plugin that implements plugin.Watchable so
+// the Manager spawns a crash watcher. fail() pushes an error on the
+// channel to simulate a child-process crash.
+type watchablePlugin struct {
+	*fakePlugin
+	crashCh chan error
+}
+
+func newWatchablePlugin(p *fakePlugin) *watchablePlugin {
+	return &watchablePlugin{fakePlugin: p, crashCh: make(chan error, 1)}
+}
+
+func (w *watchablePlugin) Watch() <-chan error { return w.crashCh }
+
+func (w *watchablePlugin) fail(err error) { w.crashCh <- err }
+
+func TestManager_CrashRecoveryUnregistersCaps(t *testing.T) {
+	root := t.TempDir()
+	priv, pub := genKeyPEM(t, root, "trusted")
+	keys, _ := plugin.LoadTrustedKeys([]string{pub})
+	pluginDir := writeSignedPlugin(t, root, "p1", priv)
+
+	wp := newWatchablePlugin(&fakePlugin{
+		abi:      plugin.ABIVersion,
+		manifest: plugin.Manifest{Name: "p1", Version: "1"},
+		caps: []plugin.Registration{
+			{Capability: domain.Capability{Name: "p1_a"}, Handler: &fakeHandler{name: "p1_a"}},
+			{Capability: domain.Capability{Name: "p1_b"}, Handler: &fakeHandler{name: "p1_b"}},
+		},
+	})
+
+	reg := capability.New()
+	opener := &fakeOpener{plugins: map[string]plugin.Plugin{pluginDir: wp}}
+
+	var (
+		eventsMu sync.Mutex
+		events   []plugin.LoadEvent
+	)
+	mgr := plugin.NewManager(plugin.ManagerConfig{
+		Dir:         root,
+		TrustedKeys: keys,
+		Loader:      &registryLoader{reg: reg},
+		Opener:      opener,
+		Unregister:  reg.Unregister,
+		OnEvent: func(ev plugin.LoadEvent) {
+			eventsMu.Lock()
+			events = append(events, ev)
+			eventsMu.Unlock()
+		},
+	})
+	if _, err := mgr.LoadAll(context.Background()); err != nil {
+		t.Fatalf("LoadAll: %v", err)
+	}
+
+	// Both caps should be registered initially.
+	if _, err := reg.GetHandler("p1_a"); err != nil {
+		t.Fatalf("p1_a missing pre-crash: %v", err)
+	}
+
+	// Trigger crash and wait for watcher to deregister.
+	wp.fail(errors.New("EOF"))
+	deadline := time.Now().Add(500 * time.Millisecond)
+	for time.Now().Before(deadline) {
+		if _, err := reg.GetHandler("p1_a"); err != nil {
+			break
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	if _, err := reg.GetHandler("p1_a"); err == nil {
+		t.Error("p1_a still registered after crash")
+	}
+	if _, err := reg.GetHandler("p1_b"); err == nil {
+		t.Error("p1_b still registered after crash")
+	}
+
+	// Snapshot must drop the crashed plugin.
+	for _, p := range mgr.Snapshot() {
+		if p.Name == "p1" {
+			t.Errorf("crashed plugin still in Snapshot: %+v", p)
+		}
+	}
+
+	// One LoadEvent with ResultCrashed should have been fired.
+	eventsMu.Lock()
+	defer eventsMu.Unlock()
+	var sawCrash bool
+	for _, ev := range events {
+		if ev.Result == plugin.ResultCrashed && ev.Name == "p1" {
+			sawCrash = true
+		}
+	}
+	if !sawCrash {
+		t.Errorf("no crashed event fired; got=%+v", events)
 	}
 }
 

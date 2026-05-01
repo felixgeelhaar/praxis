@@ -137,10 +137,17 @@ type processPlugin struct {
 	nextID  atomic.Uint64
 	pending map[string]chan ipc.Frame
 	once    sync.Once
+
+	// crashed receives the dispatcher's terminal error when the IPC
+	// stream closes (child exited, host binary crashed, kernel sent
+	// SIGKILL on RLIMIT_*). It is buffered so a fast crash before any
+	// observer attaches does not block dispatch.
+	crashed chan error
 }
 
 func (p *processPlugin) handshake() error {
 	p.pending = map[string]chan ipc.Frame{}
+	p.crashed = make(chan error, 1)
 	go p.dispatch()
 
 	mres, err := p.call(ipc.MethodManifest, ipc.ManifestParams{})
@@ -171,6 +178,13 @@ func (p *processPlugin) dispatch() {
 		f, err := p.codec.Recv()
 		if err != nil {
 			p.failAllPending(err)
+			// Surface the terminal error to the watcher. Buffered
+			// channel + non-blocking send so dispatch never hangs
+			// when no one is listening.
+			select {
+			case p.crashed <- err:
+			default:
+			}
 			return
 		}
 		p.mu.Lock()
@@ -183,6 +197,14 @@ func (p *processPlugin) dispatch() {
 		ch <- f
 	}
 }
+
+// Watch implements the Watchable interface so the Manager can be
+// notified when the child crashes (or any other event closes the IPC
+// stream). The returned channel produces exactly one error and then
+// stays open or closes depending on the dispatcher's state. Callers
+// should treat any value as the terminal status — recovery happens
+// via reload, not retry.
+func (p *processPlugin) Watch() <-chan error { return p.crashed }
 
 func (p *processPlugin) failAllPending(err error) {
 	p.mu.Lock()
