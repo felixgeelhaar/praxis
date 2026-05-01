@@ -363,9 +363,12 @@
       "completed_at": "2026-05-01T11:01:33.783200+00:00"
     },
     "t-plugin-handler-abi": {
-      "status": "pending",
+      "status": "done",
       "path": "",
-      "elapsed_minutes": 0
+      "elapsed_minutes": 90,
+      "owner": "ai-agent",
+      "started_at": "2026-05-01T13:14:51.491248+00:00",
+      "completed_at": "2026-05-01T13:14:51.491248+00:00"
     },
     "t-plugin-on-disk-discovery": {
       "status": "pending",
@@ -407,9 +410,12 @@
       "completed_at": "2026-05-01T13:01:38.077882+00:00"
     },
     "t-tenant-scope-hierarchy": {
-      "status": "pending",
+      "status": "done",
       "path": "",
-      "elapsed_minutes": 0
+      "elapsed_minutes": 90,
+      "owner": "ai-agent",
+      "started_at": "2026-05-01T13:14:51.491248+00:00",
+      "completed_at": "2026-05-01T13:14:51.491248+00:00"
     },
     "t-tenant-audit-retention": {
       "status": "pending",
