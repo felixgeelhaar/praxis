@@ -255,6 +255,74 @@ func (e *Executor) ListCapabilities(ctx context.Context) ([]domain.Capability, e
 	return e.registry.ListCapabilities(ctx)
 }
 
+// ErrNotReversible signals that the original action's capability does not
+// implement capability.Compensator.
+var ErrNotReversible = errors.New("capability does not support compensation")
+
+// Revert runs the compensating action for a previously-succeeded action.
+// The reversal is recorded under the same audit umbrella as the original;
+// the audit kind is `compensated` and the detail carries the parent ID.
+//
+// Revert is idempotent at the Praxis layer: re-calling it on an already-
+// compensated action returns the cached result.
+func (e *Executor) Revert(ctx context.Context, actionID string) (domain.Result, error) {
+	original, err := e.actions.Get(ctx, actionID)
+	if err != nil {
+		return domain.Result{}, fmt.Errorf("revert: load action %s: %w", actionID, err)
+	}
+	if original.Status != domain.StatusSucceeded {
+		return domain.Result{}, fmt.Errorf("revert: action %s status is %s, not succeeded", actionID, original.Status)
+	}
+	handler, herr := e.registry.GetHandler(original.Capability)
+	if herr != nil {
+		return domain.Result{}, fmt.Errorf("revert: %w", herr)
+	}
+	comp, ok := handler.(capability.Compensator)
+	if !ok {
+		return domain.Result{}, fmt.Errorf("%w: %s", ErrNotReversible, original.Capability)
+	}
+
+	// Idempotency: if a revert was already remembered for this action, return it.
+	revertKey := "revert:" + actionID
+	if existing, lookErr := e.idempotent.Check(ctx, revertKey); lookErr == nil && existing != nil {
+		return *existing, nil
+	}
+
+	out, cerr := comp.Compensate(ctx, original.Payload, original.Result)
+	completedAt := e.now()
+
+	res := domain.Result{
+		ActionID:    actionID,
+		Status:      domain.StatusSucceeded,
+		Output:      out,
+		StartedAt:   completedAt,
+		CompletedAt: completedAt,
+	}
+	if cerr != nil {
+		res.Status = domain.StatusFailed
+		res.Error = &domain.ActionError{Code: "compensate_failed", Message: cerr.Error()}
+	}
+
+	e.appendAudit(ctx, original, audit.KindCompensated, map[string]any{
+		"parent_action_id": actionID,
+		"revert_status":    string(res.Status),
+		"output":           res.Output,
+	})
+
+	if cerr == nil {
+		_ = e.idempotent.Remember(ctx, revertKey, res)
+	}
+	if e.outcomes != nil {
+		ev := e.mnemosEvent(original, res)
+		ev.Type = "praxis.action_compensated"
+		_ = e.outcomes.Emit(ctx, ev)
+	}
+	if cerr != nil {
+		return res, cerr
+	}
+	return res, nil
+}
+
 // Resume drives a previously-async action (currently in `validated`) through
 // the rest of the executor flow. Used by the jobs runner. Idempotent at the
 // IdempotencyKeeper layer: a duplicate Resume call will short-circuit on the

@@ -343,6 +343,97 @@ func TestDryRun_Simulatable(t *testing.T) {
 	}
 }
 
+// --- revert (Phase-3 M3.4) ---
+
+type compensatingHandler struct {
+	*fakeHandler
+	compensated   int
+	compensateErr error
+}
+
+func (h *compensatingHandler) Compensate(_ context.Context, _, _ map[string]any) (map[string]any, error) {
+	h.compensated++
+	if h.compensateErr != nil {
+		return nil, h.compensateErr
+	}
+	return map[string]any{"reverted": true}, nil
+}
+
+func TestRevert_Success(t *testing.T) {
+	logger := bolt.New(bolt.NewJSONHandler(io.Discard))
+	mem := memory.New()
+	h := &compensatingHandler{fakeHandler: &fakeHandler{name: "comp", output: map[string]any{"ok": true, "ts": "1"}}}
+	reg := capability.New()
+	_ = reg.Register(h)
+	exec := executor.New(logger, reg,
+		policy.New(logger, mem.Policy),
+		idempotency.New(mem.Idempotency),
+		handlerrunner.New(logger, handlerrunner.Config{MaxAttempts: 1}),
+		schema.New(),
+		mem.Action, mem.Audit, nil,
+	)
+
+	a := domain.Action{ID: "a-rev", Capability: "comp", Caller: domain.CallerRef{Type: "user", ID: "u"}}
+	if _, err := exec.Execute(context.Background(), a); err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+
+	res, err := exec.Revert(context.Background(), "a-rev")
+	if err != nil {
+		t.Fatalf("Revert: %v", err)
+	}
+	if res.Status != domain.StatusSucceeded {
+		t.Errorf("Revert Status=%s want succeeded", res.Status)
+	}
+	if h.compensated != 1 {
+		t.Errorf("compensated=%d want 1", h.compensated)
+	}
+
+	// Idempotent: second call should not re-invoke Compensate.
+	if _, err := exec.Revert(context.Background(), "a-rev"); err != nil {
+		t.Fatalf("Revert2: %v", err)
+	}
+	if h.compensated != 1 {
+		t.Errorf("idempotency broken: compensated=%d want 1", h.compensated)
+	}
+
+	events, _ := mem.Audit.ListForAction(context.Background(), "a-rev")
+	var saw bool
+	for _, e := range events {
+		if e.Kind == audit.KindCompensated {
+			saw = true
+		}
+	}
+	if !saw {
+		t.Errorf("missing compensated audit event")
+	}
+}
+
+func TestRevert_NonReversibleCapability(t *testing.T) {
+	h := newHarness(t, &fakeHandler{name: "test_handler", output: map[string]any{"ok": true}})
+	a := newAction("a-nr")
+	if _, err := h.exec.Execute(context.Background(), a); err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	_, err := h.exec.Revert(context.Background(), "a-nr")
+	if err == nil {
+		t.Fatal("expected ErrNotReversible")
+	}
+	if !errors.Is(err, executor.ErrNotReversible) {
+		t.Errorf("err=%v want ErrNotReversible", err)
+	}
+}
+
+func TestRevert_RejectsNonSucceeded(t *testing.T) {
+	h := newHarness(t, &fakeHandler{name: "test_handler", err: errors.New("503 boom")})
+	a := newAction("a-fail")
+	_, _ = h.exec.Execute(context.Background(), a)
+	_, err := h.exec.Revert(context.Background(), "a-fail")
+	if err == nil {
+		t.Fatal("expected error reverting a failed action")
+	}
+}
+
 // --- helpers ---
 
 func contains(haystack []string, needle string) bool {

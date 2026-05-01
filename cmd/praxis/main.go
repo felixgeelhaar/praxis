@@ -61,6 +61,8 @@ func main() {
 		os.Exit(runServe())
 	case "mcp":
 		os.Exit(runMCP())
+	case "revert":
+		os.Exit(runRevert(os.Args[2:]))
 	case "caps":
 		os.Exit(runCaps(os.Args[2:]))
 	case "run":
@@ -87,6 +89,7 @@ Usage:
   praxis caps list                   List registered capabilities
   praxis caps show <name>            Show one capability
   praxis run <cap> <json> [--dry-run] Execute or simulate a capability
+  praxis revert <action-id>          Run the compensating action for a succeeded action
   praxis log show <action-id>        Show audit lifecycle for an action
   praxis version                     Print version info
 
@@ -344,6 +347,28 @@ func runAction(args []string) int {
 		return 0
 	}
 	res, err := rt.exec.Execute(ctx, action)
+	printJSON(res)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	return 0
+}
+
+func runRevert(args []string) int {
+	if len(args) < 1 {
+		fmt.Fprintln(os.Stderr, "usage: praxis revert <action-id>")
+		return 2
+	}
+	ctx := context.Background()
+	rt, cleanup, err := bootstrap(ctx)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "bootstrap:", err)
+		return 1
+	}
+	defer cleanup()
+
+	res, err := rt.exec.Revert(ctx, args[0])
 	printJSON(res)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)

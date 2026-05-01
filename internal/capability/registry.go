@@ -22,6 +22,19 @@ type Describer interface {
 	Capability() domain.Capability
 }
 
+// Compensator is implemented by handlers that can reverse a successfully
+// executed action — for example, deleting an issue created by
+// github_create_issue, or cancelling a meeting whose ICS was emitted.
+//
+// Compensate receives the original action's payload and result. It returns
+// the compensating action's output (audit-only — not re-played through the
+// regular pipeline) and an error if the reversal failed. Best-effort
+// reversals (vendors that cannot exactly undo the side effect) should
+// surface that in the output payload.
+type Compensator interface {
+	Compensate(ctx context.Context, originalPayload, originalOutput map[string]any) (map[string]any, error)
+}
+
 type Registry struct {
 	handlers     map[string]Handler
 	capabilities map[string]domain.Capability

@@ -168,6 +168,16 @@ func newMux(deps kernelDeps, m *metrics) *http.ServeMux {
 		writeJSON(w, http.StatusOK, a)
 	})))
 
+	mux.Handle("POST /v1/actions/{id}/revert", traced(authed(func(w http.ResponseWriter, r *http.Request) {
+		id := r.PathValue("id")
+		res, err := deps.exec.Revert(r.Context(), id)
+		status := http.StatusOK
+		if err != nil {
+			status = http.StatusBadRequest
+		}
+		writeJSON(w, status, res)
+	})))
+
 	mux.Handle("POST /v1/actions/{id}/dry-run", traced(authed(func(w http.ResponseWriter, r *http.Request) {
 		action, err := decodeAction(r)
 		if err != nil {
