@@ -33,6 +33,7 @@ import (
 	httphandler "github.com/felixgeelhaar/praxis/internal/handlers/http"
 	slackhandler "github.com/felixgeelhaar/praxis/internal/handlers/slack"
 	"github.com/felixgeelhaar/praxis/internal/idempotency"
+	"github.com/felixgeelhaar/praxis/internal/jobs"
 	"github.com/felixgeelhaar/praxis/internal/outcome"
 	"github.com/felixgeelhaar/praxis/internal/policy"
 	"github.com/felixgeelhaar/praxis/internal/ports"
@@ -177,6 +178,9 @@ func runServe() int {
 	defer cleanup()
 
 	go rt.emitter.Run(ctx)
+
+	jobsRunner := jobs.New(rt.logger, rt.repos.Action, rt.exec, jobs.Config{})
+	go jobsRunner.Run(ctx)
 
 	m := &metrics{}
 	mux := newMux(kernelDeps{

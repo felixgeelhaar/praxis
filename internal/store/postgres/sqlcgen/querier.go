@@ -13,10 +13,12 @@ type Querier interface {
 	BumpOutcomeAttempt(ctx context.Context, arg BumpOutcomeAttemptParams) error
 	DeletePolicyRule(ctx context.Context, id string) error
 	EnqueueOutcome(ctx context.Context, arg EnqueueOutcomeParams) error
-	GetAction(ctx context.Context, id string) (Action, error)
+	GetAction(ctx context.Context, id string) (GetActionRow, error)
 	GetCapability(ctx context.Context, name string) (Capability, error)
+	ListActionsPaged(ctx context.Context, limit int32) ([]ListActionsPagedRow, error)
 	ListAuditForAction(ctx context.Context, actionID string) ([]AuditEvent, error)
 	ListCapabilities(ctx context.Context) ([]Capability, error)
+	ListPendingAsync(ctx context.Context, limit int32) ([]ListPendingAsyncRow, error)
 	ListPolicyRules(ctx context.Context) ([]PolicyRule, error)
 	LookupIdempotency(ctx context.Context, key string) (IdempotencyKey, error)
 	MarkOutcomeDelivered(ctx context.Context, arg MarkOutcomeDeliveredParams) error

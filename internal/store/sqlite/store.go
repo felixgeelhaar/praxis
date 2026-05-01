@@ -250,6 +250,10 @@ func (a *actionAdapter) Save(ctx context.Context, act domain.Action) error {
 	if act.PolicyDecision != nil {
 		policyJSON = nullStr(mustJSON(act.PolicyDecision))
 	}
+	mode := string(act.Mode)
+	if mode == "" {
+		mode = string(domain.ModeSync)
+	}
 	return a.q.UpsertAction(ctx, sqlcgen.UpsertActionParams{
 		ID:             act.ID,
 		Capability:     act.Capability,
@@ -260,6 +264,7 @@ func (a *actionAdapter) Save(ctx context.Context, act domain.Action) error {
 		Scope:          mustJSON(act.Scope),
 		IdempotencyKey: act.IdempotencyKey,
 		Status:         string(act.Status),
+		Mode:           mode,
 		Result:         resultJSON,
 		Error:          errorJSON,
 		PolicyDecision: policyJSON,
@@ -278,7 +283,33 @@ func (a *actionAdapter) Get(ctx context.Context, id string) (domain.Action, erro
 	if err != nil {
 		return domain.Action{}, err
 	}
-	return actionFromRow(row), nil
+	return actionFromRow(sqlcgen.Action{
+		ID: row.ID, Capability: row.Capability, Payload: row.Payload,
+		CallerType: row.CallerType, CallerID: row.CallerID, CallerName: row.CallerName,
+		Scope: row.Scope, IdempotencyKey: row.IdempotencyKey, Status: row.Status,
+		Mode: row.Mode, Result: row.Result, Error: row.Error, PolicyDecision: row.PolicyDecision,
+		ExecutedAt: row.ExecutedAt, CompletedAt: row.CompletedAt,
+		CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt,
+	}), nil
+}
+
+func (a *actionAdapter) ListPendingAsync(ctx context.Context, limit int) ([]domain.Action, error) {
+	rows, err := a.q.ListPendingAsync(ctx, int64(limit))
+	if err != nil {
+		return nil, err
+	}
+	out := make([]domain.Action, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, actionFromRow(sqlcgen.Action{
+			ID: r.ID, Capability: r.Capability, Payload: r.Payload,
+			CallerType: r.CallerType, CallerID: r.CallerID, CallerName: r.CallerName,
+			Scope: r.Scope, IdempotencyKey: r.IdempotencyKey, Status: r.Status,
+			Mode: r.Mode, Result: r.Result, Error: r.Error, PolicyDecision: r.PolicyDecision,
+			ExecutedAt: r.ExecutedAt, CompletedAt: r.CompletedAt,
+			CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt,
+		}))
+	}
+	return out, nil
 }
 
 func (a *actionAdapter) UpdateStatus(ctx context.Context, id string, s domain.ActionStatus) error {
@@ -319,6 +350,7 @@ func actionFromRow(r sqlcgen.Action) domain.Action {
 		Scope:          parseJSONStrings(r.Scope),
 		IdempotencyKey: r.IdempotencyKey,
 		Status:         domain.ActionStatus(r.Status),
+		Mode:           domain.ActionMode(r.Mode),
 		ExecutedAt:     parseNullTS(r.ExecutedAt),
 		CompletedAt:    parseNullTS(r.CompletedAt),
 		CreatedAt:      created,

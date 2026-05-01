@@ -20,8 +20,8 @@ FROM capabilities
 ORDER BY name;
 
 -- name: UpsertAction :exec
-INSERT INTO actions (id, capability, payload, caller_type, caller_id, caller_name, scope, idempotency_key, status, result, error, policy_decision, executed_at, completed_at, created_at, updated_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+INSERT INTO actions (id, capability, payload, caller_type, caller_id, caller_name, scope, idempotency_key, status, mode, result, error, policy_decision, executed_at, completed_at, created_at, updated_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
 ON CONFLICT(id) DO UPDATE SET
     capability      = EXCLUDED.capability,
     payload         = EXCLUDED.payload,
@@ -31,6 +31,7 @@ ON CONFLICT(id) DO UPDATE SET
     scope           = EXCLUDED.scope,
     idempotency_key = EXCLUDED.idempotency_key,
     status          = EXCLUDED.status,
+    mode            = EXCLUDED.mode,
     result          = EXCLUDED.result,
     error           = EXCLUDED.error,
     policy_decision = EXCLUDED.policy_decision,
@@ -39,14 +40,27 @@ ON CONFLICT(id) DO UPDATE SET
     updated_at      = EXCLUDED.updated_at;
 
 -- name: GetAction :one
-SELECT id, capability, payload, caller_type, caller_id, caller_name, scope, idempotency_key, status, result, error, policy_decision, executed_at, completed_at, created_at, updated_at
+SELECT id, capability, payload, caller_type, caller_id, caller_name, scope, idempotency_key, status, mode, result, error, policy_decision, executed_at, completed_at, created_at, updated_at
 FROM actions WHERE id = $1;
+
+-- name: ListPendingAsync :many
+SELECT id, capability, payload, caller_type, caller_id, caller_name, scope, idempotency_key, status, mode, result, error, policy_decision, executed_at, completed_at, created_at, updated_at
+FROM actions
+WHERE mode = 'async' AND status = 'validated'
+ORDER BY created_at
+LIMIT $1;
 
 -- name: UpdateActionStatus :exec
 UPDATE actions SET status = $2, updated_at = $3 WHERE id = $1;
 
 -- name: PutActionResult :exec
 UPDATE actions SET status = $2, result = $3, error = $4, completed_at = $5, updated_at = $6 WHERE id = $1;
+
+-- name: ListActionsPaged :many
+SELECT id, capability, payload, caller_type, caller_id, caller_name, scope, idempotency_key, status, mode, result, error, policy_decision, executed_at, completed_at, created_at, updated_at
+FROM actions
+ORDER BY created_at DESC
+LIMIT $1;
 
 -- name: AppendAuditEvent :exec
 INSERT INTO audit_events (id, action_id, kind, capability, caller_type, detail, created_at)

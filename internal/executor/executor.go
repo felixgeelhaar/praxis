@@ -129,6 +129,18 @@ func (e *Executor) Execute(ctx context.Context, action domain.Action) (domain.Re
 		return e.reject(ctx, action, "rate_limited", "rate limit exceeded; retry after "+retryAfter.String())
 	}
 
+	// Async dispatch: persist as validated and return immediately. The jobs
+	// runner drains validated/async rows and resumes through Resume().
+	if action.Mode == domain.ModeAsync {
+		_ = e.actions.Save(ctx, action)
+		e.logger.Info().Str("action_id", action.ID).Msg("async action enqueued")
+		return domain.Result{
+			ActionID:  action.ID,
+			Status:    domain.StatusValidated,
+			StartedAt: action.CreatedAt,
+		}, nil
+	}
+
 	if existing, err := e.idempotent.Check(ctx, action.IdempotencyKey); err == nil && existing != nil {
 		e.logger.Info().Str("idempotency_key", action.IdempotencyKey).Msg("idempotency hit")
 		return *existing, nil
@@ -234,6 +246,54 @@ func (e *Executor) DryRun(ctx context.Context, action domain.Action) (domain.Sim
 // Executor so the public API surface stays at three verbs.
 func (e *Executor) ListCapabilities(ctx context.Context) ([]domain.Capability, error) {
 	return e.registry.ListCapabilities(ctx)
+}
+
+// Resume drives a previously-async action (currently in `validated`) through
+// the rest of the executor flow. Used by the jobs runner. Idempotent at the
+// IdempotencyKeeper layer: a duplicate Resume call will short-circuit on the
+// remembered result.
+func (e *Executor) Resume(ctx context.Context, action domain.Action) (domain.Result, error) {
+	cap, err := e.registry.GetCapability(action.Capability)
+	if err != nil {
+		return e.reject(ctx, action, "unknown_capability", err.Error())
+	}
+
+	if existing, err := e.idempotent.Check(ctx, action.IdempotencyKey); err == nil && existing != nil {
+		return *existing, nil
+	}
+
+	if err := e.transition(ctx, &action, domain.EventExecute); err != nil {
+		return domain.Result{}, err
+	}
+	startedAt := e.now()
+	action.ExecutedAt = &startedAt
+	_ = e.actions.Save(ctx, action)
+	e.appendAudit(ctx, action, audit.KindExecuted, nil)
+
+	handler, herr := e.registry.GetHandler(action.Capability)
+	if herr != nil {
+		return e.terminateWithTimes(ctx, action, startedAt, e.now(), nil, &domain.ActionError{
+			Code: "unknown_handler", Message: herr.Error(),
+		})
+	}
+	output, runErr := e.runner.RunWithCapability(ctx, &cap, handler, action.Payload)
+	completedAt := e.now()
+
+	var actionErr *domain.ActionError
+	if runErr != nil {
+		actionErr = &domain.ActionError{
+			Code:      classifyErr(runErr),
+			Message:   runErr.Error(),
+			Retryable: handlerrunner.IsRetryable(runErr),
+		}
+	} else if oerr := e.validator.ValidateOutput(output, cap.OutputSchema); oerr != nil {
+		actionErr = &domain.ActionError{
+			Code:    "output_validation_failed",
+			Message: oerr.Error(),
+		}
+	}
+
+	return e.terminateWithTimes(ctx, action, startedAt, completedAt, output, actionErr)
 }
 
 // --- internals ---

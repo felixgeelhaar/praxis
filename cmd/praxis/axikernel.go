@@ -143,8 +143,12 @@ func newMux(deps kernelDeps, m *metrics) *http.ServeMux {
 			m.actionsRejected.Add(1)
 		}
 		status := http.StatusOK
-		if execErr != nil {
+		switch {
+		case execErr != nil:
 			status = httpStatusForExecError(execErr, res)
+		case action.Mode == domain.ModeAsync && res.Status == domain.StatusValidated:
+			// Accepted for async processing — caller polls GET /v1/actions/{id}.
+			status = http.StatusAccepted
 		}
 		writeJSON(w, status, res)
 	})))

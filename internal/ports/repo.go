@@ -17,6 +17,9 @@ type ActionRepo interface {
 	Get(ctx context.Context, id string) (domain.Action, error)
 	UpdateStatus(ctx context.Context, id string, s domain.ActionStatus) error
 	PutResult(ctx context.Context, id string, r domain.Result) error
+	// ListPendingAsync returns up to `limit` async actions still in the
+	// validated state — the queue the jobs runner drains.
+	ListPendingAsync(ctx context.Context, limit int) ([]domain.Action, error)
 }
 
 type IdempotencyRepo interface {

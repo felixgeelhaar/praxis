@@ -114,6 +114,22 @@ func (r *actionRepo) UpdateStatus(_ context.Context, id string, s domain.ActionS
 	return nil
 }
 
+func (r *actionRepo) ListPendingAsync(_ context.Context, limit int) ([]domain.Action, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	out := make([]domain.Action, 0)
+	for _, a := range r.actions {
+		if a.Mode == domain.ModeAsync && a.Status == domain.StatusValidated {
+			out = append(out, a)
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].CreatedAt.Before(out[j].CreatedAt) })
+	if limit > 0 && len(out) > limit {
+		out = out[:limit]
+	}
+	return out, nil
+}
+
 func (r *actionRepo) PutResult(_ context.Context, id string, res domain.Result) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()

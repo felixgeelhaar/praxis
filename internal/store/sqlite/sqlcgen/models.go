@@ -25,6 +25,7 @@ type Action struct {
 	CompletedAt    sql.NullString `json:"completed_at"`
 	CreatedAt      string         `json:"created_at"`
 	UpdatedAt      string         `json:"updated_at"`
+	Mode           string         `json:"mode"`
 }
 
 type AuditEvent struct {

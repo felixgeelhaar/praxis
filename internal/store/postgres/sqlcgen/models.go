@@ -25,6 +25,7 @@ type Action struct {
 	CompletedAt    pgtype.Timestamptz `json:"completed_at"`
 	CreatedAt      pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+	Mode           string             `json:"mode"`
 }
 
 type AuditEvent struct {

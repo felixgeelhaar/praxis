@@ -88,13 +88,33 @@ func (q *Queries) EnqueueOutcome(ctx context.Context, arg EnqueueOutcomeParams) 
 }
 
 const getAction = `-- name: GetAction :one
-SELECT id, capability, payload, caller_type, caller_id, caller_name, scope, idempotency_key, status, result, error, policy_decision, executed_at, completed_at, created_at, updated_at
+SELECT id, capability, payload, caller_type, caller_id, caller_name, scope, idempotency_key, status, mode, result, error, policy_decision, executed_at, completed_at, created_at, updated_at
 FROM actions WHERE id = $1
 `
 
-func (q *Queries) GetAction(ctx context.Context, id string) (Action, error) {
+type GetActionRow struct {
+	ID             string             `json:"id"`
+	Capability     string             `json:"capability"`
+	Payload        []byte             `json:"payload"`
+	CallerType     string             `json:"caller_type"`
+	CallerID       string             `json:"caller_id"`
+	CallerName     string             `json:"caller_name"`
+	Scope          []string           `json:"scope"`
+	IdempotencyKey string             `json:"idempotency_key"`
+	Status         string             `json:"status"`
+	Mode           string             `json:"mode"`
+	Result         []byte             `json:"result"`
+	Error          []byte             `json:"error"`
+	PolicyDecision []byte             `json:"policy_decision"`
+	ExecutedAt     pgtype.Timestamptz `json:"executed_at"`
+	CompletedAt    pgtype.Timestamptz `json:"completed_at"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+}
+
+func (q *Queries) GetAction(ctx context.Context, id string) (GetActionRow, error) {
 	row := q.db.QueryRow(ctx, getAction, id)
-	var i Action
+	var i GetActionRow
 	err := row.Scan(
 		&i.ID,
 		&i.Capability,
@@ -105,6 +125,7 @@ func (q *Queries) GetAction(ctx context.Context, id string) (Action, error) {
 		&i.Scope,
 		&i.IdempotencyKey,
 		&i.Status,
+		&i.Mode,
 		&i.Result,
 		&i.Error,
 		&i.PolicyDecision,
@@ -135,6 +156,71 @@ func (q *Queries) GetCapability(ctx context.Context, name string) (Capability, e
 		&i.RegisteredAt,
 	)
 	return i, err
+}
+
+const listActionsPaged = `-- name: ListActionsPaged :many
+SELECT id, capability, payload, caller_type, caller_id, caller_name, scope, idempotency_key, status, mode, result, error, policy_decision, executed_at, completed_at, created_at, updated_at
+FROM actions
+ORDER BY created_at DESC
+LIMIT $1
+`
+
+type ListActionsPagedRow struct {
+	ID             string             `json:"id"`
+	Capability     string             `json:"capability"`
+	Payload        []byte             `json:"payload"`
+	CallerType     string             `json:"caller_type"`
+	CallerID       string             `json:"caller_id"`
+	CallerName     string             `json:"caller_name"`
+	Scope          []string           `json:"scope"`
+	IdempotencyKey string             `json:"idempotency_key"`
+	Status         string             `json:"status"`
+	Mode           string             `json:"mode"`
+	Result         []byte             `json:"result"`
+	Error          []byte             `json:"error"`
+	PolicyDecision []byte             `json:"policy_decision"`
+	ExecutedAt     pgtype.Timestamptz `json:"executed_at"`
+	CompletedAt    pgtype.Timestamptz `json:"completed_at"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+}
+
+func (q *Queries) ListActionsPaged(ctx context.Context, limit int32) ([]ListActionsPagedRow, error) {
+	rows, err := q.db.Query(ctx, listActionsPaged, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListActionsPagedRow
+	for rows.Next() {
+		var i ListActionsPagedRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Capability,
+			&i.Payload,
+			&i.CallerType,
+			&i.CallerID,
+			&i.CallerName,
+			&i.Scope,
+			&i.IdempotencyKey,
+			&i.Status,
+			&i.Mode,
+			&i.Result,
+			&i.Error,
+			&i.PolicyDecision,
+			&i.ExecutedAt,
+			&i.CompletedAt,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listAuditForAction = `-- name: ListAuditForAction :many
@@ -194,6 +280,72 @@ func (q *Queries) ListCapabilities(ctx context.Context) ([]Capability, error) {
 			&i.Simulatable,
 			&i.Idempotent,
 			&i.RegisteredAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listPendingAsync = `-- name: ListPendingAsync :many
+SELECT id, capability, payload, caller_type, caller_id, caller_name, scope, idempotency_key, status, mode, result, error, policy_decision, executed_at, completed_at, created_at, updated_at
+FROM actions
+WHERE mode = 'async' AND status = 'validated'
+ORDER BY created_at
+LIMIT $1
+`
+
+type ListPendingAsyncRow struct {
+	ID             string             `json:"id"`
+	Capability     string             `json:"capability"`
+	Payload        []byte             `json:"payload"`
+	CallerType     string             `json:"caller_type"`
+	CallerID       string             `json:"caller_id"`
+	CallerName     string             `json:"caller_name"`
+	Scope          []string           `json:"scope"`
+	IdempotencyKey string             `json:"idempotency_key"`
+	Status         string             `json:"status"`
+	Mode           string             `json:"mode"`
+	Result         []byte             `json:"result"`
+	Error          []byte             `json:"error"`
+	PolicyDecision []byte             `json:"policy_decision"`
+	ExecutedAt     pgtype.Timestamptz `json:"executed_at"`
+	CompletedAt    pgtype.Timestamptz `json:"completed_at"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+}
+
+func (q *Queries) ListPendingAsync(ctx context.Context, limit int32) ([]ListPendingAsyncRow, error) {
+	rows, err := q.db.Query(ctx, listPendingAsync, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListPendingAsyncRow
+	for rows.Next() {
+		var i ListPendingAsyncRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Capability,
+			&i.Payload,
+			&i.CallerType,
+			&i.CallerID,
+			&i.CallerName,
+			&i.Scope,
+			&i.IdempotencyKey,
+			&i.Status,
+			&i.Mode,
+			&i.Result,
+			&i.Error,
+			&i.PolicyDecision,
+			&i.ExecutedAt,
+			&i.CompletedAt,
+			&i.CreatedAt,
+			&i.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -433,8 +585,8 @@ func (q *Queries) UpdateActionStatus(ctx context.Context, arg UpdateActionStatus
 }
 
 const upsertAction = `-- name: UpsertAction :exec
-INSERT INTO actions (id, capability, payload, caller_type, caller_id, caller_name, scope, idempotency_key, status, result, error, policy_decision, executed_at, completed_at, created_at, updated_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+INSERT INTO actions (id, capability, payload, caller_type, caller_id, caller_name, scope, idempotency_key, status, mode, result, error, policy_decision, executed_at, completed_at, created_at, updated_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
 ON CONFLICT(id) DO UPDATE SET
     capability      = EXCLUDED.capability,
     payload         = EXCLUDED.payload,
@@ -444,6 +596,7 @@ ON CONFLICT(id) DO UPDATE SET
     scope           = EXCLUDED.scope,
     idempotency_key = EXCLUDED.idempotency_key,
     status          = EXCLUDED.status,
+    mode            = EXCLUDED.mode,
     result          = EXCLUDED.result,
     error           = EXCLUDED.error,
     policy_decision = EXCLUDED.policy_decision,
@@ -462,6 +615,7 @@ type UpsertActionParams struct {
 	Scope          []string           `json:"scope"`
 	IdempotencyKey string             `json:"idempotency_key"`
 	Status         string             `json:"status"`
+	Mode           string             `json:"mode"`
 	Result         []byte             `json:"result"`
 	Error          []byte             `json:"error"`
 	PolicyDecision []byte             `json:"policy_decision"`
@@ -482,6 +636,7 @@ func (q *Queries) UpsertAction(ctx context.Context, arg UpsertActionParams) erro
 		arg.Scope,
 		arg.IdempotencyKey,
 		arg.Status,
+		arg.Mode,
 		arg.Result,
 		arg.Error,
 		arg.PolicyDecision,

@@ -87,13 +87,33 @@ func (q *Queries) EnqueueOutcome(ctx context.Context, arg EnqueueOutcomeParams) 
 }
 
 const getAction = `-- name: GetAction :one
-SELECT id, capability, payload, caller_type, caller_id, caller_name, scope, idempotency_key, status, result, error, policy_decision, executed_at, completed_at, created_at, updated_at
+SELECT id, capability, payload, caller_type, caller_id, caller_name, scope, idempotency_key, status, mode, result, error, policy_decision, executed_at, completed_at, created_at, updated_at
 FROM actions WHERE id = ?
 `
 
-func (q *Queries) GetAction(ctx context.Context, id string) (Action, error) {
+type GetActionRow struct {
+	ID             string         `json:"id"`
+	Capability     string         `json:"capability"`
+	Payload        string         `json:"payload"`
+	CallerType     string         `json:"caller_type"`
+	CallerID       string         `json:"caller_id"`
+	CallerName     string         `json:"caller_name"`
+	Scope          string         `json:"scope"`
+	IdempotencyKey string         `json:"idempotency_key"`
+	Status         string         `json:"status"`
+	Mode           string         `json:"mode"`
+	Result         sql.NullString `json:"result"`
+	Error          sql.NullString `json:"error"`
+	PolicyDecision sql.NullString `json:"policy_decision"`
+	ExecutedAt     sql.NullString `json:"executed_at"`
+	CompletedAt    sql.NullString `json:"completed_at"`
+	CreatedAt      string         `json:"created_at"`
+	UpdatedAt      string         `json:"updated_at"`
+}
+
+func (q *Queries) GetAction(ctx context.Context, id string) (GetActionRow, error) {
 	row := q.db.QueryRowContext(ctx, getAction, id)
-	var i Action
+	var i GetActionRow
 	err := row.Scan(
 		&i.ID,
 		&i.Capability,
@@ -104,6 +124,7 @@ func (q *Queries) GetAction(ctx context.Context, id string) (Action, error) {
 		&i.Scope,
 		&i.IdempotencyKey,
 		&i.Status,
+		&i.Mode,
 		&i.Result,
 		&i.Error,
 		&i.PolicyDecision,
@@ -134,6 +155,74 @@ func (q *Queries) GetCapability(ctx context.Context, name string) (Capability, e
 		&i.RegisteredAt,
 	)
 	return i, err
+}
+
+const listActionsPaged = `-- name: ListActionsPaged :many
+SELECT id, capability, payload, caller_type, caller_id, caller_name, scope, idempotency_key, status, mode, result, error, policy_decision, executed_at, completed_at, created_at, updated_at
+FROM actions
+ORDER BY created_at DESC
+LIMIT ?
+`
+
+type ListActionsPagedRow struct {
+	ID             string         `json:"id"`
+	Capability     string         `json:"capability"`
+	Payload        string         `json:"payload"`
+	CallerType     string         `json:"caller_type"`
+	CallerID       string         `json:"caller_id"`
+	CallerName     string         `json:"caller_name"`
+	Scope          string         `json:"scope"`
+	IdempotencyKey string         `json:"idempotency_key"`
+	Status         string         `json:"status"`
+	Mode           string         `json:"mode"`
+	Result         sql.NullString `json:"result"`
+	Error          sql.NullString `json:"error"`
+	PolicyDecision sql.NullString `json:"policy_decision"`
+	ExecutedAt     sql.NullString `json:"executed_at"`
+	CompletedAt    sql.NullString `json:"completed_at"`
+	CreatedAt      string         `json:"created_at"`
+	UpdatedAt      string         `json:"updated_at"`
+}
+
+func (q *Queries) ListActionsPaged(ctx context.Context, limit int64) ([]ListActionsPagedRow, error) {
+	rows, err := q.db.QueryContext(ctx, listActionsPaged, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListActionsPagedRow
+	for rows.Next() {
+		var i ListActionsPagedRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Capability,
+			&i.Payload,
+			&i.CallerType,
+			&i.CallerID,
+			&i.CallerName,
+			&i.Scope,
+			&i.IdempotencyKey,
+			&i.Status,
+			&i.Mode,
+			&i.Result,
+			&i.Error,
+			&i.PolicyDecision,
+			&i.ExecutedAt,
+			&i.CompletedAt,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listAuditForAction = `-- name: ListAuditForAction :many
@@ -196,6 +285,75 @@ func (q *Queries) ListCapabilities(ctx context.Context) ([]Capability, error) {
 			&i.Simulatable,
 			&i.Idempotent,
 			&i.RegisteredAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listPendingAsync = `-- name: ListPendingAsync :many
+SELECT id, capability, payload, caller_type, caller_id, caller_name, scope, idempotency_key, status, mode, result, error, policy_decision, executed_at, completed_at, created_at, updated_at
+FROM actions
+WHERE mode = 'async' AND status = 'validated'
+ORDER BY created_at
+LIMIT ?
+`
+
+type ListPendingAsyncRow struct {
+	ID             string         `json:"id"`
+	Capability     string         `json:"capability"`
+	Payload        string         `json:"payload"`
+	CallerType     string         `json:"caller_type"`
+	CallerID       string         `json:"caller_id"`
+	CallerName     string         `json:"caller_name"`
+	Scope          string         `json:"scope"`
+	IdempotencyKey string         `json:"idempotency_key"`
+	Status         string         `json:"status"`
+	Mode           string         `json:"mode"`
+	Result         sql.NullString `json:"result"`
+	Error          sql.NullString `json:"error"`
+	PolicyDecision sql.NullString `json:"policy_decision"`
+	ExecutedAt     sql.NullString `json:"executed_at"`
+	CompletedAt    sql.NullString `json:"completed_at"`
+	CreatedAt      string         `json:"created_at"`
+	UpdatedAt      string         `json:"updated_at"`
+}
+
+func (q *Queries) ListPendingAsync(ctx context.Context, limit int64) ([]ListPendingAsyncRow, error) {
+	rows, err := q.db.QueryContext(ctx, listPendingAsync, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListPendingAsyncRow
+	for rows.Next() {
+		var i ListPendingAsyncRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Capability,
+			&i.Payload,
+			&i.CallerType,
+			&i.CallerID,
+			&i.CallerName,
+			&i.Scope,
+			&i.IdempotencyKey,
+			&i.Status,
+			&i.Mode,
+			&i.Result,
+			&i.Error,
+			&i.PolicyDecision,
+			&i.ExecutedAt,
+			&i.CompletedAt,
+			&i.CreatedAt,
+			&i.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -447,8 +605,8 @@ func (q *Queries) UpdateActionStatus(ctx context.Context, arg UpdateActionStatus
 }
 
 const upsertAction = `-- name: UpsertAction :exec
-INSERT INTO actions (id, capability, payload, caller_type, caller_id, caller_name, scope, idempotency_key, status, result, error, policy_decision, executed_at, completed_at, created_at, updated_at)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+INSERT INTO actions (id, capability, payload, caller_type, caller_id, caller_name, scope, idempotency_key, status, mode, result, error, policy_decision, executed_at, completed_at, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT(id) DO UPDATE SET
     capability      = excluded.capability,
     payload         = excluded.payload,
@@ -458,6 +616,7 @@ ON CONFLICT(id) DO UPDATE SET
     scope           = excluded.scope,
     idempotency_key = excluded.idempotency_key,
     status          = excluded.status,
+    mode            = excluded.mode,
     result          = excluded.result,
     error           = excluded.error,
     policy_decision = excluded.policy_decision,
@@ -476,6 +635,7 @@ type UpsertActionParams struct {
 	Scope          string         `json:"scope"`
 	IdempotencyKey string         `json:"idempotency_key"`
 	Status         string         `json:"status"`
+	Mode           string         `json:"mode"`
 	Result         sql.NullString `json:"result"`
 	Error          sql.NullString `json:"error"`
 	PolicyDecision sql.NullString `json:"policy_decision"`
@@ -496,6 +656,7 @@ func (q *Queries) UpsertAction(ctx context.Context, arg UpsertActionParams) erro
 		arg.Scope,
 		arg.IdempotencyKey,
 		arg.Status,
+		arg.Mode,
 		arg.Result,
 		arg.Error,
 		arg.PolicyDecision,
