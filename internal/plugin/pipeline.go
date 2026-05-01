@@ -46,6 +46,60 @@ type PipelineError struct {
 	Err error
 }
 
+// Failure-cause labels used by callers to populate the
+// praxis_plugin_load_total{result} metric. Stable strings — operators
+// build alerts against them.
+const (
+	ResultSuccess        = "success"
+	ResultManifest       = "manifest_invalid"
+	ResultArtifact       = "artifact_missing"
+	ResultUnsafeArtifact = "unsafe_artifact"
+	ResultDuplicate      = "duplicate_name"
+	ResultManifestMiss   = "manifest_missing"
+	ResultSignature      = "signature_failed"
+	ResultNoTrustedKeys  = "no_trusted_keys"
+	ResultABIMismatch    = "abi_mismatch"
+	ResultDlopen         = "dlopen_failed"
+	ResultLoad           = "load_failed"
+)
+
+// ClassifyError maps a per-plugin error to one of the Result* constants.
+// Falls back to ResultLoad for unrecognised errors so the metric always
+// labels something.
+func ClassifyError(err error) string {
+	switch {
+	case err == nil:
+		return ResultSuccess
+	case errors.Is(err, ErrSignatureInvalid):
+		return ResultSignature
+	case errors.Is(err, ErrSignatureMissing):
+		return ResultSignature
+	case errors.Is(err, ErrNoTrustedKeys):
+		return ResultNoTrustedKeys
+	case errors.Is(err, ErrManifestMissing):
+		return ResultManifestMiss
+	case errors.Is(err, ErrManifestInvalid):
+		return ResultManifest
+	case errors.Is(err, ErrArtifactMissing):
+		return ResultArtifact
+	case errors.Is(err, ErrUnsafeArtifact):
+		return ResultUnsafeArtifact
+	case errors.Is(err, ErrDuplicateName):
+		return ResultDuplicate
+	}
+	var mm *ABIMismatchError
+	if errors.As(err, &mm) {
+		return ResultABIMismatch
+	}
+	// dlopen errors come from the Opener and have no exported sentinel;
+	// the message starts with "open plugin" by convention in pipeline.go.
+	if msg := err.Error(); len(msg) > 0 && (msg == "open plugin" ||
+		(len(msg) > 11 && msg[:11] == "open plugin")) {
+		return ResultDlopen
+	}
+	return ResultLoad
+}
+
 // Error implements error.
 func (e *PipelineError) Error() string {
 	return fmt.Sprintf("plugin %s: %v", e.Dir, e.Err)

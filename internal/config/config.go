@@ -26,6 +26,7 @@ type Config struct {
 	OutboxPollEvery   time.Duration
 	PluginDir         string   // PRAXIS_PLUGIN_DIR; empty disables plugin discovery
 	PluginTrustedKeys []string // PRAXIS_PLUGIN_TRUSTED_KEYS; PEM ECDSA public keys for cosign-blob verification
+	PluginStrict      bool     // PRAXIS_PLUGIN_STRICT=1; any plugin load error aborts startup
 	// AuditRetention maps OrgID to retention window. The empty key is the
 	// default applied to events whose OrgID is unset. Configured via
 	// PRAXIS_AUDIT_RETENTION as a comma-separated list of "orgID=duration"
@@ -52,6 +53,7 @@ func Load() (Config, error) {
 		OutboxPollEvery:   getDur("PRAXIS_OUTBOX_POLL_EVERY", 2*time.Second),
 		PluginDir:         os.Getenv("PRAXIS_PLUGIN_DIR"),
 		PluginTrustedKeys: parseList(os.Getenv("PRAXIS_PLUGIN_TRUSTED_KEYS")),
+		PluginStrict:      parseBool(os.Getenv("PRAXIS_PLUGIN_STRICT")),
 		AuditRetention:    parseRetention(os.Getenv("PRAXIS_AUDIT_RETENTION")),
 	}
 
@@ -102,6 +104,18 @@ func getDur(key string, def time.Duration) time.Duration {
 		return def
 	}
 	return d
+}
+
+// parseBool reads a boolean env var. Truthy values: 1, true, yes, on
+// (case-insensitive). Anything else (including empty) is false. Used
+// for explicit opt-in flags where unknown values must default to off
+// rather than panic.
+func parseBool(raw string) bool {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case "1", "true", "yes", "on":
+		return true
+	}
+	return false
 }
 
 // parseList splits a comma-separated env var into trimmed non-empty

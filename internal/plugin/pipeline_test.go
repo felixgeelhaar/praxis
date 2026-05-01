@@ -229,6 +229,33 @@ func TestPipeline_DiscoveryErrorAborts(t *testing.T) {
 	}
 }
 
+func TestClassifyError_KnownSentinels(t *testing.T) {
+	cases := []struct {
+		name string
+		err  error
+		want string
+	}{
+		{"nil", nil, plugin.ResultSuccess},
+		{"signature invalid", plugin.ErrSignatureInvalid, plugin.ResultSignature},
+		{"signature missing", plugin.ErrSignatureMissing, plugin.ResultSignature},
+		{"no trusted keys", plugin.ErrNoTrustedKeys, plugin.ResultNoTrustedKeys},
+		{"manifest invalid", plugin.ErrManifestInvalid, plugin.ResultManifest},
+		{"manifest missing", plugin.ErrManifestMissing, plugin.ResultManifestMiss},
+		{"artifact missing", plugin.ErrArtifactMissing, plugin.ResultArtifact},
+		{"unsafe artifact", plugin.ErrUnsafeArtifact, plugin.ResultUnsafeArtifact},
+		{"duplicate name", plugin.ErrDuplicateName, plugin.ResultDuplicate},
+		{"abi mismatch", &plugin.ABIMismatchError{Want: "v1", Got: "v0"}, plugin.ResultABIMismatch},
+		{"unknown wrapped", errors.New("anything else"), plugin.ResultLoad},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := plugin.ClassifyError(tc.err); got != tc.want {
+				t.Errorf("ClassifyError(%v)=%s want %s", tc.err, got, tc.want)
+			}
+		})
+	}
+}
+
 // registryLoader bridges *capability.Registry into plugin.Loader.
 type registryLoader struct{ reg *capability.Registry }
 

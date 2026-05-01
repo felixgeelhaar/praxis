@@ -97,6 +97,47 @@ func TestLoad_AuditRetention_DropsMalformed(t *testing.T) {
 	}
 }
 
+func TestLoad_PluginStrict_Default(t *testing.T) {
+	t.Setenv("PRAXIS_PLUGIN_STRICT", "")
+	c, err := config.Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if c.PluginStrict {
+		t.Error("PluginStrict default must be false")
+	}
+}
+
+func TestLoad_PluginStrict_TruthyValues(t *testing.T) {
+	for _, v := range []string{"1", "true", "TRUE", "yes", "on"} {
+		t.Run(v, func(t *testing.T) {
+			t.Setenv("PRAXIS_PLUGIN_STRICT", v)
+			c, err := config.Load()
+			if err != nil {
+				t.Fatalf("Load: %v", err)
+			}
+			if !c.PluginStrict {
+				t.Errorf("PluginStrict=%s should be truthy", v)
+			}
+		})
+	}
+}
+
+func TestLoad_PluginStrict_FalsyValues(t *testing.T) {
+	for _, v := range []string{"0", "false", "no", "off", "garbage"} {
+		t.Run(v, func(t *testing.T) {
+			t.Setenv("PRAXIS_PLUGIN_STRICT", v)
+			c, err := config.Load()
+			if err != nil {
+				t.Fatalf("Load: %v", err)
+			}
+			if c.PluginStrict {
+				t.Errorf("PluginStrict=%s should be falsy", v)
+			}
+		})
+	}
+}
+
 func TestLoad_PluginTrustedKeys_DefaultsNil(t *testing.T) {
 	t.Setenv("PRAXIS_PLUGIN_TRUSTED_KEYS", "")
 	c, err := config.Load()

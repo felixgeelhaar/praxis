@@ -23,6 +23,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -52,6 +53,14 @@ type metrics struct {
 	actionsSimulated atomic.Uint64
 	requestDurMs     atomic.Uint64
 	requestCount     atomic.Uint64
+	pluginLoad       sync.Map // result string -> *atomic.Uint64
+}
+
+// incPluginLoad bumps the result-labelled plugin-load counter. Safe to
+// call concurrently from the bootstrap goroutine that loads plugins.
+func (m *metrics) incPluginLoad(result string) {
+	v, _ := m.pluginLoad.LoadOrStore(result, &atomic.Uint64{})
+	v.(*atomic.Uint64).Add(1)
 }
 
 func newMux(deps kernelDeps, m *metrics) *http.ServeMux {
@@ -74,6 +83,12 @@ func newMux(deps kernelDeps, m *metrics) *http.ServeMux {
 		fmt.Fprintf(w, "# TYPE praxis_outcome_emit_total counter\n")
 		fmt.Fprintf(w, "praxis_outcome_emit_total{result=\"delivered\"} %d\n", delivered)
 		fmt.Fprintf(w, "praxis_outcome_emit_total{result=\"failed\"} %d\n", failures)
+		fmt.Fprintf(w, "# HELP praxis_plugin_load_total Plugin load attempts by outcome.\n")
+		fmt.Fprintf(w, "# TYPE praxis_plugin_load_total counter\n")
+		m.pluginLoad.Range(func(k, v any) bool {
+			fmt.Fprintf(w, "praxis_plugin_load_total{result=%q} %d\n", k.(string), v.(*atomic.Uint64).Load())
+			return true
+		})
 		count := m.requestCount.Load()
 		var avg uint64
 		if count > 0 {

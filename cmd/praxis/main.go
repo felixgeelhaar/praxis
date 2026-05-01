@@ -114,6 +114,7 @@ type runtime struct {
 	reg      *capability.Registry
 	auditSvc *audit.Service
 	emitter  *outcome.Emitter
+	metrics  *metrics
 }
 
 func bootstrap(ctx context.Context) (*runtime, func(), error) {
@@ -135,7 +136,8 @@ func bootstrap(ctx context.Context) (*runtime, func(), error) {
 	registry := capability.New()
 	registerHandlers(registry)
 
-	if err := loadPlugins(ctx, logger, cfg, registry); err != nil {
+	m := &metrics{}
+	if err := loadPlugins(ctx, logger, cfg, registry, m); err != nil {
 		return nil, cleanup, err
 	}
 
@@ -159,7 +161,7 @@ func bootstrap(ctx context.Context) (*runtime, func(), error) {
 
 	return &runtime{
 		logger: logger, cfg: cfg, repos: repos, exec: exec, reg: registry,
-		auditSvc: auditSvc, emitter: emitter,
+		auditSvc: auditSvc, emitter: emitter, metrics: m,
 	}, cleanup, nil
 }
 
@@ -172,10 +174,11 @@ func (l *pluginRegistryLoader) Register(r plugin.Registration) error {
 }
 
 // loadPlugins runs the discover→verify→open→Load pipeline. Empty
-// PRAXIS_PLUGIN_DIR is a no-op. Per-plugin failures log and continue;
-// a hard error (missing dir, missing trust bundle while plugins exist)
-// surfaces as a bootstrap error so the operator notices.
-func loadPlugins(ctx context.Context, logger *bolt.Logger, cfg config.Config, reg *capability.Registry) error {
+// PRAXIS_PLUGIN_DIR is a no-op. Per-plugin failures log and continue
+// in non-strict mode; PRAXIS_PLUGIN_STRICT=1 turns any per-plugin
+// failure into a bootstrap error so production deployments fail fast
+// rather than running with a partially populated registry.
+func loadPlugins(ctx context.Context, logger *bolt.Logger, cfg config.Config, reg *capability.Registry, m *metrics) error {
 	if cfg.PluginDir == "" {
 		return nil
 	}
@@ -193,18 +196,25 @@ func loadPlugins(ctx context.Context, logger *bolt.Logger, cfg config.Config, re
 		return fmt.Errorf("plugin pipeline: %w", err)
 	}
 	for _, e := range res.Errors {
+		result := plugin.ClassifyError(e.Err)
+		m.incPluginLoad(result)
 		logger.Error().
 			Str("plugin_dir", e.Dir).
+			Str("result", result).
 			Str("error", e.Err.Error()).
 			Msg("plugin load failed")
 	}
 	for _, p := range res.Loaded {
+		m.incPluginLoad(plugin.ResultSuccess)
 		logger.Info().
 			Str("plugin_dir", p.Dir).
 			Str("name", p.Manifest.Name).
 			Str("version", p.Manifest.Version).
 			Str("abi", p.ABI).
 			Msg("plugin loaded")
+	}
+	if cfg.PluginStrict && len(res.Errors) > 0 {
+		return fmt.Errorf("plugin pipeline: %d plugin(s) failed to load and PRAXIS_PLUGIN_STRICT=1", len(res.Errors))
 	}
 	return nil
 }
@@ -253,12 +263,11 @@ func runServe() int {
 	jobsRunner := jobs.New(rt.logger, rt.repos.Action, rt.exec, jobs.Config{})
 	go jobsRunner.Run(ctx)
 
-	m := &metrics{}
 	mux := newMux(kernelDeps{
 		logger: rt.logger, exec: rt.exec, registry: rt.reg, repos: rt.repos,
 		auditSvc: rt.auditSvc,
 		emitter:  rt.emitter, apiToken: rt.cfg.APIToken,
-	}, m)
+	}, rt.metrics)
 
 	addr := fmt.Sprintf("%s:%d", rt.cfg.HTTPHost, rt.cfg.HTTPPort)
 	srv := &http.Server{
