@@ -17,9 +17,13 @@ import (
 	"sync"
 
 	"github.com/santhosh-tekuri/jsonschema/v6"
+	"golang.org/x/text/language"
+	"golang.org/x/text/message"
 
 	"github.com/felixgeelhaar/praxis/internal/domain"
 )
+
+var enPrinter = message.NewPrinter(language.English)
 
 // ErrValidationFailed is the sentinel error returned for any validation
 // failure. Callers can use errors.Is to branch.
@@ -147,16 +151,49 @@ func fnvBytes(b []byte) uint64 {
 	return h.Sum64()
 }
 
-// summariseError reduces a jsonschema validation error to a single line.
+// summariseError reduces a jsonschema validation error to a short, human-
+// readable list. The library's default Error() prepends the resolved schema
+// URL on the first line — useful when debugging the schema itself, noisy
+// for end users. We walk the leaf causes and emit `<path>: <reason>` pairs
+// derived from each kind's GoString.
 func summariseError(err error) string {
 	if err == nil {
 		return ""
 	}
-	msg := err.Error()
-	if idx := strings.Index(msg, "\n"); idx > 0 {
-		msg = msg[:idx]
+	var ve *jsonschema.ValidationError
+	if !errors.As(err, &ve) {
+		return err.Error()
 	}
-	return msg
+	leaves := collectLeaves(ve, nil)
+	if len(leaves) == 0 {
+		return formatKind(ve)
+	}
+	parts := make([]string, 0, len(leaves))
+	for _, l := range leaves {
+		loc := strings.Join(l.InstanceLocation, "/")
+		if loc == "" {
+			loc = "(root)"
+		}
+		parts = append(parts, loc+": "+formatKind(l))
+	}
+	return strings.Join(parts, "; ")
+}
+
+func formatKind(ve *jsonschema.ValidationError) string {
+	if ve == nil || ve.ErrorKind == nil {
+		return "schema violation"
+	}
+	return ve.ErrorKind.LocalizedString(enPrinter)
+}
+
+func collectLeaves(ve *jsonschema.ValidationError, acc []*jsonschema.ValidationError) []*jsonschema.ValidationError {
+	if len(ve.Causes) == 0 {
+		return append(acc, ve)
+	}
+	for _, c := range ve.Causes {
+		acc = collectLeaves(c, acc)
+	}
+	return acc
 }
 
 // BuildReport packages a boolean + error list into the domain.ValidationReport
