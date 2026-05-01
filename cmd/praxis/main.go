@@ -34,6 +34,7 @@ import (
 	slackhandler "github.com/felixgeelhaar/praxis/internal/handlers/slack"
 	"github.com/felixgeelhaar/praxis/internal/idempotency"
 	"github.com/felixgeelhaar/praxis/internal/jobs"
+	pmcp "github.com/felixgeelhaar/praxis/internal/mcp"
 	"github.com/felixgeelhaar/praxis/internal/outcome"
 	"github.com/felixgeelhaar/praxis/internal/policy"
 	"github.com/felixgeelhaar/praxis/internal/ports"
@@ -55,6 +56,8 @@ func main() {
 	switch os.Args[1] {
 	case "serve":
 		os.Exit(runServe())
+	case "mcp":
+		os.Exit(runMCP())
 	case "caps":
 		os.Exit(runCaps(os.Args[2:]))
 	case "run":
@@ -77,6 +80,7 @@ func printUsage() {
 
 Usage:
   praxis serve                       Start HTTP API
+  praxis mcp                         Start stdio MCP server
   praxis caps list                   List registered capabilities
   praxis caps show <name>            Show one capability
   praxis run <cap> <json> [--dry-run] Execute or simulate a capability
@@ -215,6 +219,29 @@ func runServe() int {
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 		_ = srv.Shutdown(shutdownCtx)
+	}
+	return 0
+}
+
+func runMCP() int {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	rt, cleanup, err := bootstrap(ctx)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "bootstrap:", err)
+		return 1
+	}
+	defer cleanup()
+
+	go rt.emitter.Run(ctx)
+	jobsRunner := jobs.New(rt.logger, rt.repos.Action, rt.exec, jobs.Config{})
+	go jobsRunner.Run(ctx)
+
+	srv := pmcp.Register(pmcp.Info{Name: "praxis", Version: Version}, rt.exec, generateID)
+	if err := pmcp.ServeStdio(ctx, srv); err != nil {
+		rt.logger.Error().Err(err).Msg("mcp serve")
+		return 1
 	}
 	return 0
 }
