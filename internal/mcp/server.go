@@ -29,7 +29,15 @@ import (
 	"github.com/felixgeelhaar/mcp-go"
 
 	"github.com/felixgeelhaar/praxis/internal/domain"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 )
+
+const tracerName = "github.com/felixgeelhaar/praxis/internal/mcp"
+
+func tracer() trace.Tracer { return otel.Tracer(tracerName) }
 
 // Executor is the subset of executor.Executor used by the MCP surface.
 // Defined as an interface so this package is unit-testable without a full
@@ -104,17 +112,28 @@ func Register(info Info, exec Executor, idGen func() string) *mcp.Server {
 	srv.Tool("list_capabilities").
 		Description("List every capability this Praxis server knows how to execute. Returns the full descriptor so callers can validate input client-side. Optional org_id/team_id scope the result to the caller's tenant-private capabilities plus the globals.").
 		Handler(func(ctx context.Context, in ListCapsInput) (ListCapsOutput, error) {
+			ctx, span := tracer().Start(ctx, "mcp.list_capabilities",
+				trace.WithAttributes(
+					attribute.String("praxis.org.id", in.OrgID),
+					attribute.String("praxis.team.id", in.TeamID),
+				))
+			defer span.End()
 			caller := domain.CallerRef{OrgID: in.OrgID, TeamID: in.TeamID}
 			caps, err := exec.ListCapabilitiesForCaller(ctx, caller)
 			if err != nil {
+				span.SetStatus(codes.Error, err.Error())
 				return ListCapsOutput{}, err
 			}
+			span.SetAttributes(attribute.Int("praxis.capabilities.count", len(caps)))
 			return ListCapsOutput{Capabilities: caps}, nil
 		})
 
 	srv.Tool("execute").
 		Description("Execute a registered capability under policy. Returns the action's result, including a stable external_id when the destination provides one. Set mode=async to receive a 202-equivalent (status=validated) and poll later via the HTTP /v1/actions/{id} endpoint.").
 		Handler(func(ctx context.Context, in ExecuteInput) (ExecuteOutput, error) {
+			ctx, span := tracer().Start(ctx, "mcp.execute",
+				trace.WithAttributes(attribute.String("praxis.capability", in.Capability)))
+			defer span.End()
 			a := actionFromInput(in, idGen)
 			res, err := exec.Execute(ctx, a)
 			out := ExecuteOutput{
@@ -126,9 +145,11 @@ func Register(info Info, exec Executor, idGen func() string) *mcp.Server {
 			if res.Error != nil {
 				out.ErrorCode = res.Error.Code
 				out.ErrorMsg = res.Error.Message
+				span.SetStatus(codes.Error, res.Error.Message)
 			} else if err != nil {
 				out.ErrorCode = "execute_error"
 				out.ErrorMsg = err.Error()
+				span.SetStatus(codes.Error, err.Error())
 			}
 			return out, nil
 		})
@@ -136,9 +157,13 @@ func Register(info Info, exec Executor, idGen func() string) *mcp.Server {
 	srv.Tool("dry_run").
 		Description("Simulate a capability invocation without contacting the destination. Returns the policy decision and a faithful preview when the capability is simulatable.").
 		Handler(func(ctx context.Context, in ExecuteInput) (DryRunOutput, error) {
+			ctx, span := tracer().Start(ctx, "mcp.dry_run",
+				trace.WithAttributes(attribute.String("praxis.capability", in.Capability)))
+			defer span.End()
 			a := actionFromInput(in, idGen)
 			sim, err := exec.DryRun(ctx, a)
 			if err != nil {
+				span.SetStatus(codes.Error, err.Error())
 				return DryRunOutput{}, err
 			}
 			return DryRunOutput{
@@ -184,6 +209,9 @@ func registerPerCapability(srv *mcp.Server, exec Executor, idGen func() string) 
 		srv.Tool(c.Name).
 			Description(desc).
 			Handler(func(ctx context.Context, in CapInput) (ExecuteOutput, error) {
+				ctx, span := tracer().Start(ctx, "mcp.tool."+c.Name,
+					trace.WithAttributes(attribute.String("praxis.capability", c.Name)))
+				defer span.End()
 				a := actionFromCapInput(c.Name, in, idGen)
 				res, eerr := exec.Execute(ctx, a)
 				out := ExecuteOutput{
@@ -195,9 +223,11 @@ func registerPerCapability(srv *mcp.Server, exec Executor, idGen func() string) 
 				if res.Error != nil {
 					out.ErrorCode = res.Error.Code
 					out.ErrorMsg = res.Error.Message
+					span.SetStatus(codes.Error, res.Error.Message)
 				} else if eerr != nil {
 					out.ErrorCode = "execute_error"
 					out.ErrorMsg = eerr.Error()
+					span.SetStatus(codes.Error, eerr.Error())
 				}
 				return out, nil
 			})
