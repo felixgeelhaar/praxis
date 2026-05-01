@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/felixgeelhaar/praxis/internal/domain"
 )
@@ -31,6 +32,20 @@ type CompatIssue struct {
 	Code    string
 	Field   string
 	Message string
+}
+
+// HistoryEntry records one re-registration that introduced breaking
+// changes. The endpoint /v1/capabilities/{name}/changelog renders these
+// so operators can audit what shifted between versions. Phase 5: the
+// history is kept in memory for now; SQL persistence is a follow-up
+// task once the access pattern is clearer.
+type HistoryEntry struct {
+	At                time.Time
+	PrevInputVersion  string
+	PrevOutputVersion string
+	NextInputVersion  string
+	NextOutputVersion string
+	Issues            []CompatIssue
 }
 
 // CompatMode mirrors schema.CompatMode at the registry boundary.
@@ -91,6 +106,8 @@ type Registry struct {
 	compatMode    CompatMode
 	compatChecker CompatChecker
 	onBreak       func(capName string, issues []CompatIssue)
+	history       map[string][]HistoryEntry
+	clock         func() time.Time
 }
 
 func New() *Registry {
@@ -100,7 +117,21 @@ func New() *Registry {
 		tenantHandlers:     make(map[string]map[string]Handler),
 		tenantCapabilities: make(map[string]map[string]domain.Capability),
 		compatMode:         CompatOff,
+		history:            map[string][]HistoryEntry{},
+		clock:              time.Now,
 	}
+}
+
+// History returns the breaking-change log for a capability, oldest
+// entry first. An empty result means either the capability has never
+// re-registered with breaking changes or the registry was started in
+// CompatOff mode (the checker never ran). Phase 5.
+func (r *Registry) History(name string) []HistoryEntry {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	out := make([]HistoryEntry, len(r.history[name]))
+	copy(out, r.history[name])
+	return out
 }
 
 // SetCompatMode configures the schema compatibility check applied at
@@ -128,6 +159,14 @@ func (r *Registry) Register(h Handler) error {
 				if r.onBreak != nil {
 					r.onBreak(h.Name(), issues)
 				}
+				r.history[h.Name()] = append(r.history[h.Name()], HistoryEntry{
+					At:                r.clock(),
+					PrevInputVersion:  prev.InputSchemaVersion,
+					PrevOutputVersion: prev.OutputSchemaVersion,
+					NextInputVersion:  desc.InputSchemaVersion,
+					NextOutputVersion: desc.OutputSchemaVersion,
+					Issues:            issues,
+				})
 				if r.compatMode == CompatStrict {
 					return fmt.Errorf("%w: %s introduces %d issue(s)", ErrIncompatibleSchema, h.Name(), len(issues))
 				}

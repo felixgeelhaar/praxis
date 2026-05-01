@@ -245,6 +245,35 @@ func TestRegistry_CompatWarn_AllowsButFiresHook(t *testing.T) {
 	}
 }
 
+func TestRegistry_HistoryRecordsBreakingRegistrations(t *testing.T) {
+	reg := capability.New()
+	reg.SetCompatMode(capability.CompatWarn,
+		func(_ domain.Capability, _ domain.Capability) []capability.CompatIssue {
+			return []capability.CompatIssue{{Code: "x", Field: "y", Message: "broke"}}
+		},
+		nil,
+	)
+	_ = reg.Register(&mockHandler{name: "h"})
+	_ = reg.Register(&mockHandler{name: "h"})
+	_ = reg.Register(&mockHandler{name: "h"})
+
+	hist := reg.History("h")
+	if len(hist) != 2 {
+		t.Errorf("history=%d want 2 (only re-registrations after the first)", len(hist))
+	}
+	if len(hist) > 0 && len(hist[0].Issues) != 1 {
+		t.Errorf("first entry issues=%+v", hist[0].Issues)
+	}
+}
+
+func TestRegistry_HistoryEmptyForCleanRegistration(t *testing.T) {
+	reg := capability.New()
+	_ = reg.Register(&mockHandler{name: "h"})
+	if len(reg.History("h")) != 0 {
+		t.Error("clean registration should not record history")
+	}
+}
+
 func TestRegistry_CompatOff_NeverChecks(t *testing.T) {
 	reg := capability.New()
 	checked := false

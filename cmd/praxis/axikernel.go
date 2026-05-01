@@ -172,6 +172,14 @@ func newMux(deps kernelDeps, m *metrics) *http.ServeMux {
 		writeJSON(w, http.StatusOK, cap)
 	})))
 
+	mux.Handle("GET /v1/capabilities/{name}/changelog", traced(authed(func(w http.ResponseWriter, r *http.Request) {
+		name := r.PathValue("name")
+		writeJSON(w, http.StatusOK, map[string]any{
+			"name":    name,
+			"entries": deps.registry.History(name),
+		})
+	})))
+
 	mux.Handle("POST /v1/actions", traced(authed(func(w http.ResponseWriter, r *http.Request) {
 		action, err := decodeAction(r)
 		if err != nil {
