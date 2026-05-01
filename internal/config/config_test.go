@@ -134,6 +134,52 @@ func TestLoad_AuditRetentionInterval_Override(t *testing.T) {
 	}
 }
 
+func TestLoad_OTLP_Defaults(t *testing.T) {
+	t.Setenv("PRAXIS_OTLP_ENDPOINT", "")
+	t.Setenv("PRAXIS_OTLP_PROTOCOL", "")
+	t.Setenv("PRAXIS_OTLP_INSECURE", "")
+	t.Setenv("PRAXIS_TRACE_SAMPLE", "")
+	c, err := config.Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if c.OTLPEndpoint != "" {
+		t.Errorf("OTLPEndpoint=%q want empty", c.OTLPEndpoint)
+	}
+	if c.OTLPProtocol != "grpc" {
+		t.Errorf("OTLPProtocol=%q want grpc", c.OTLPProtocol)
+	}
+	if c.OTLPInsecure {
+		t.Error("OTLPInsecure should default false")
+	}
+	if c.TraceSample != 1.0 {
+		t.Errorf("TraceSample=%v want 1.0", c.TraceSample)
+	}
+}
+
+func TestLoad_OTLP_Overrides(t *testing.T) {
+	t.Setenv("PRAXIS_OTLP_ENDPOINT", "otel-collector:4317")
+	t.Setenv("PRAXIS_OTLP_PROTOCOL", "http")
+	t.Setenv("PRAXIS_OTLP_INSECURE", "true")
+	t.Setenv("PRAXIS_TRACE_SAMPLE", "0.05")
+	c, err := config.Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if c.OTLPEndpoint != "otel-collector:4317" {
+		t.Errorf("Endpoint=%q", c.OTLPEndpoint)
+	}
+	if c.OTLPProtocol != "http" {
+		t.Errorf("Protocol=%q", c.OTLPProtocol)
+	}
+	if !c.OTLPInsecure {
+		t.Error("Insecure should be true")
+	}
+	if c.TraceSample != 0.05 {
+		t.Errorf("Sample=%v want 0.05", c.TraceSample)
+	}
+}
+
 func TestLoad_PluginAutoreload_DefaultsOn(t *testing.T) {
 	t.Setenv("PRAXIS_PLUGIN_AUTORELOAD", "")
 	c, err := config.Load()

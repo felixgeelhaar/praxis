@@ -28,6 +28,10 @@ type Config struct {
 	PluginTrustedKeys          []string      // PRAXIS_PLUGIN_TRUSTED_KEYS; PEM ECDSA public keys for cosign-blob verification
 	PluginStrict               bool          // PRAXIS_PLUGIN_STRICT=1; any plugin load error aborts startup
 	PluginAutoreload           bool          // PRAXIS_PLUGIN_AUTORELOAD; default true. fsnotify-driven hot reload.
+	OTLPEndpoint               string        // PRAXIS_OTLP_ENDPOINT; empty disables tracing
+	OTLPProtocol               string        // PRAXIS_OTLP_PROTOCOL; grpc (default) or http
+	OTLPInsecure               bool          // PRAXIS_OTLP_INSECURE; default false (TLS)
+	TraceSample                float64       // PRAXIS_TRACE_SAMPLE; 0..1 sampling probability, default 1.0
 	AuditRetentionInterval     time.Duration // PRAXIS_AUDIT_RETENTION_INTERVAL; cadence between sweeps
 	AuditRetentionInitialDelay time.Duration // PRAXIS_AUDIT_RETENTION_INITIAL_DELAY; defer first sweep
 	// AuditRetention maps OrgID to retention window. The empty key is the
@@ -61,6 +65,10 @@ func Load() (Config, error) {
 		AuditRetention:             parseRetention(os.Getenv("PRAXIS_AUDIT_RETENTION")),
 		AuditRetentionInterval:     getDur("PRAXIS_AUDIT_RETENTION_INTERVAL", time.Hour),
 		AuditRetentionInitialDelay: getDur("PRAXIS_AUDIT_RETENTION_INITIAL_DELAY", 5*time.Minute),
+		OTLPEndpoint:               os.Getenv("PRAXIS_OTLP_ENDPOINT"),
+		OTLPProtocol:               strings.ToLower(getEnv("PRAXIS_OTLP_PROTOCOL", "grpc")),
+		OTLPInsecure:               parseBool(os.Getenv("PRAXIS_OTLP_INSECURE")),
+		TraceSample:                getFloat("PRAXIS_TRACE_SAMPLE", 1.0),
 	}
 
 	switch c.DBType {
@@ -110,6 +118,18 @@ func getDur(key string, def time.Duration) time.Duration {
 		return def
 	}
 	return d
+}
+
+func getFloat(key string, def float64) float64 {
+	v := os.Getenv(key)
+	if v == "" {
+		return def
+	}
+	f, err := strconv.ParseFloat(v, 64)
+	if err != nil {
+		return def
+	}
+	return f
 }
 
 // parseBool reads a boolean env var. Truthy values: 1, true, yes, on

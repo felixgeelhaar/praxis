@@ -39,6 +39,7 @@ import (
 	"github.com/felixgeelhaar/praxis/internal/idempotency"
 	"github.com/felixgeelhaar/praxis/internal/jobs"
 	pmcp "github.com/felixgeelhaar/praxis/internal/mcp"
+	"github.com/felixgeelhaar/praxis/internal/observability"
 	"github.com/felixgeelhaar/praxis/internal/outcome"
 	"github.com/felixgeelhaar/praxis/internal/plugin"
 	"github.com/felixgeelhaar/praxis/internal/policy"
@@ -123,6 +124,7 @@ type runtime struct {
 	pluginManager *plugin.Manager
 	emitter       *outcome.Emitter
 	metrics       *metrics
+	tracerStop    observability.ShutdownFn
 }
 
 func bootstrap(ctx context.Context) (*runtime, func(), error) {
@@ -131,14 +133,29 @@ func bootstrap(ctx context.Context) (*runtime, func(), error) {
 	if err != nil {
 		return nil, nil, err
 	}
+	_, tracerStop, err := observability.Init(ctx, observability.TracingConfig{
+		Endpoint:       cfg.OTLPEndpoint,
+		Protocol:       cfg.OTLPProtocol,
+		Insecure:       cfg.OTLPInsecure,
+		Sample:         cfg.TraceSample,
+		ServiceName:    "praxis",
+		ServiceVersion: Version,
+	})
+	if err != nil {
+		return nil, nil, fmt.Errorf("observability init: %w", err)
+	}
 	repos, err := store.Open(ctx, logger, store.Config{Type: cfg.DBType, Conn: cfg.DBConn})
 	if err != nil {
+		_ = tracerStop(ctx)
 		return nil, nil, err
 	}
 	cleanup := func() {
 		if repos.Close != nil {
 			_ = repos.Close()
 		}
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = tracerStop(shutdownCtx)
 	}
 
 	registry := capability.New()
@@ -171,7 +188,7 @@ func bootstrap(ctx context.Context) (*runtime, func(), error) {
 	return &runtime{
 		logger: logger, cfg: cfg, repos: repos, exec: exec, reg: registry,
 		auditSvc: auditSvc, pluginManager: pluginMgr,
-		emitter: emitter, metrics: m,
+		emitter: emitter, metrics: m, tracerStop: tracerStop,
 	}, cleanup, nil
 }
 
