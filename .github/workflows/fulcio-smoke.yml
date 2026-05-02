@@ -59,46 +59,8 @@ jobs:
 
       - name: Run praxis VerifyKeyless against the signed artefact
         run: |
-          # Inline test target that drives the verifier the same way the
-          # plugin pipeline does, but against real Sigstore output.
-          cat > /tmp/smoke.go <<'EOF'
-          package main
-
-          import (
-              "crypto/x509"
-              "encoding/pem"
-              "fmt"
-              "os"
-              "github.com/felixgeelhaar/praxis/internal/plugin"
-          )
-
-          func main() {
-              roots, err := plugin.LoadFulcioRoots([]string{"/tmp/fulcio_v1.crt.pem"})
-              if err != nil {
-                  fmt.Println("load roots:", err)
-                  os.Exit(1)
-              }
-              v := plugin.KeylessVerifier{
-                  FulcioRoots: roots,
-                  // GitHub Actions OIDC issuer; subject is the workflow ref.
-                  TrustedIdentities: []plugin.Identity{{
-                      SubjectGlob: "https://github.com/" + os.Getenv("GITHUB_REPOSITORY") + "/*",
-                      Issuer:      "https://token.actions.githubusercontent.com",
-                  }},
-              }
-              if err := plugin.VerifyKeyless(plugin.Discovered{Artifact: "/tmp/plugin/plugin.so"}, v); err != nil {
-                  fmt.Println("VerifyKeyless:", err)
-                  // Diagnostic: print the cert subject + issuer for debug.
-                  raw, _ := os.ReadFile("/tmp/plugin/plugin.so.cert")
-                  if blk, _ := pem.Decode(raw); blk != nil {
-                      if c, perr := x509.ParseCertificate(blk.Bytes); perr == nil {
-                          fmt.Println("cert SANs (URI):", c.URIs)
-                          fmt.Println("cert Subject:", c.Subject)
-                      }
-                  }
-                  os.Exit(1)
-              }
-              fmt.Println("OK: VerifyKeyless succeeded against real Fulcio cert")
-          }
-          EOF
-          go run /tmp/smoke.go
+          go run ./cmd/fulcio-smoke \
+            --artifact /tmp/plugin/plugin.so \
+            --fulcio-root /tmp/fulcio_v1.crt.pem \
+            --subject-glob "https://github.com/${GITHUB_REPOSITORY}/*" \
+            --issuer "https://token.actions.githubusercontent.com"
