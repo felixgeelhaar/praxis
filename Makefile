@@ -77,3 +77,13 @@ release-check: fmt vet lint test build
 .PHONY: clean
 clean:
 	rm -rf $(BIN_DIR) coverage.out coverage.html
+
+# nox-scan refreshes the security baseline. Output lands in .nox/out;
+# review the diff in findings.json before committing. Findings not
+# explicitly waived in .nox/vex.json fail CI once the security workflow
+# is enabled (deferred until every category is triaged).
+.PHONY: nox-scan
+nox-scan:
+	@command -v nox >/dev/null 2>&1 || { echo >&2 "nox not found. Install: https://github.com/nox-hq/nox/releases"; exit 1; }
+	@mkdir -p .nox/out
+	nox scan . -format all -output ./.nox/out

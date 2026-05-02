@@ -34,3 +34,7 @@ tmp/
 # Bench output (current.txt is a transient artefact of `make bench-check`;
 # baseline.txt IS committed)
 bench/current.txt
+
+# nox scan artefacts. findings.json (at repo root) IS committed (the
+# security baseline); other formats regenerate on every scan.
+.nox/out/
