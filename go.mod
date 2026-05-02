@@ -7,7 +7,7 @@ require (
 	github.com/felixgeelhaar/fortify v1.2.1
 	github.com/felixgeelhaar/mcp-go v1.10.0
 	github.com/felixgeelhaar/statekit v0.8.0
-	github.com/fsnotify/fsnotify v1.7.0
+	github.com/fsnotify/fsnotify v1.10.0
 	github.com/jackc/pgx/v5 v5.9.2
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2
 	github.com/slack-go/slack v0.23.0
