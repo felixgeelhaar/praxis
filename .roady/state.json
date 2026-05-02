@@ -1,6 +1,6 @@
 {
   "project_id": "Praxis",
-  "version": 89,
+  "version": 93,
   "task_states": {
     "t-action-fsm": {
       "status": "done",
@@ -190,16 +190,26 @@
       "elapsed_minutes": 3
     },
     "t-changelog-persist": {
-      "status": "pending",
+      "status": "done",
       "path": "",
+      "owner": "ai-agent",
+      "evidence": [
+        "447651b"
+      ],
+      "started_at": "2026-05-02T12:01:49.773801+02:00",
+      "completed_at": "2026-05-02T12:01:52.700903+02:00",
       "elapsed_minutes": 0
     },
     "t-changelog-schema": {
-      "status": "in_progress",
+      "status": "done",
       "path": "",
       "owner": "claude-code",
+      "evidence": [
+        "447651b"
+      ],
       "started_at": "2026-05-02T11:45:01.722074+02:00",
-      "elapsed_minutes": 0
+      "completed_at": "2026-05-02T12:01:47.328606+02:00",
+      "elapsed_minutes": 16
     },
     "t-cli-caps-org-flag": {
       "status": "done",
@@ -282,8 +292,10 @@
       "elapsed_minutes": 0
     },
     "t-fulcio-verifier": {
-      "status": "pending",
+      "status": "in_progress",
       "path": "",
+      "owner": "ai-agent",
+      "started_at": "2026-05-02T12:02:32.270435+02:00",
       "elapsed_minutes": 0
     },
     "t-gitignore-editorconfig": {
@@ -917,5 +929,5 @@
       "elapsed_minutes": 0
     }
   },
-  "updated_at": "2026-05-02T11:45:01.722074+02:00"
+  "updated_at": "2026-05-02T12:02:32.270435+02:00"
 }
