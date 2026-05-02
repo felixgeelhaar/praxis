@@ -202,6 +202,39 @@
       "status": "not_affected",
       "justification": "vulnerable_code_not_present",
       "impact_statement": "Single hit in CHANGELOG.md line 21 — the v0.2.0 release-notes entry describing how the new MCP federation HTTP transport forwards 'Authorization: Bearer ...' headers. Documentation prose, not a real token; the heuristic fired on the literal phrase. Sister case to SEC-437 / SEC-545 / SEC-629."
+    },
+    {
+      "vulnerability": {
+        "@id": "IAC-306",
+        "name": "IAC-306",
+        "description": "GHA workflow requests OIDC token write"
+      },
+      "products": [{"@id": "pkg:golang/github.com/felixgeelhaar/praxis"}],
+      "status": "not_affected",
+      "justification": "inline_mitigations_already_exist",
+      "impact_statement": "Single hit in .github/workflows/fulcio-smoke.yml line 18: `id-token: write` is required for cosign to mint a Fulcio certificate during keyless signing — it's the *intended* behaviour the rule flags. Permission scope is limited to that one workflow; the rest of the matrix runs with the default read-only token."
+    },
+    {
+      "vulnerability": {
+        "@id": "IAC-308",
+        "name": "IAC-308",
+        "description": "GHA manual workflow dispatch enabled"
+      },
+      "products": [{"@id": "pkg:golang/github.com/felixgeelhaar/praxis"}],
+      "status": "not_affected",
+      "justification": "inline_mitigations_already_exist",
+      "impact_statement": "workflow_dispatch is intentional on fulcio-smoke and bench-baseline so a maintainer can re-run the smoke or refresh the bench baseline without pushing a commit. Repository-write is gated by GitHub's branch protection; only repo writers can dispatch."
+    },
+    {
+      "vulnerability": {
+        "@id": "SEC-697",
+        "name": "SEC-697",
+        "description": "Detected Literal API Key"
+      },
+      "products": [{"@id": "pkg:golang/github.com/felixgeelhaar/praxis"}],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_present",
+      "impact_statement": "All hits land on test-fixture identifiers and config-file references (e.g. `os.Getenv(\"GITHUB_TOKEN\")`, `os.Getenv(\"SLACK_TOKEN\")`) — the rule fires on the literal phrase 'API key' / 'token' near a string literal, but every hit is the env-var lookup pattern that *avoids* hardcoded secrets. No real key material at any hit; sister case to SEC-545 / SEC-629."
     }
   ]
 }
