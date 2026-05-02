@@ -84,9 +84,13 @@ Every action lifecycle event is appended to `audit_events` with the tenant's `or
 
 `PRAXIS_AUDIT_RETENTION` configures per-tenant retention windows (`*=720h,org-x=2160h,org-y=0`); `0` opts a tenant out of purges. The retention scheduler runs once an hour after a five-minute startup delay; cancellation propagates from the bootstrap context.
 
-## Security baseline (`findings.json`)
+## Security baseline (`.nox/vex.json`)
 
-`findings.json` at the repo root is the committed snapshot of [`nox`](https://github.com/nox-hq/nox) v0.7.0 scan results — 122 findings across 16 rule categories. The categories observed:
+`.nox/vex.json` (OpenVEX v0.2.0) carries one statement per [`nox`](https://github.com/nox-hq/nox) v0.7.0 rule category that fires on the praxis source tree. Each statement records `status`, `justification`, and a human-readable `impact_statement` so future maintainers see *why* a rule was accepted, not just that it was. The `security.yml` CI workflow runs a fresh scan on every push and PR and uploads SARIF + SBOM artefacts to GitHub Code Scanning. New rule categories surface as PR annotations.
+
+A standalone `findings.json` is intentionally not committed: nox 0.7.0 has no `--exclude` flag (see [Nox-HQ/nox#38](https://github.com/Nox-HQ/nox/issues/38)) and recursively scans its own JSON output, producing thousands of self-referential matches that drown out the real signal. CI scans regenerate findings each run.
+
+Categories currently waived:
 
 | Rule | Count | Notes |
 |---|---:|---|
@@ -102,14 +106,14 @@ Every action lifecycle event is appended to `audit_events` with the tenant's `or
 | `SEC-629` (LOB API key heuristic) | 1 | False positive matching test fixture. |
 | `SEC-162` / `DATA-005` | 4 | Roady metadata + docker-compose example IP. |
 
-Refresh the baseline with:
+Refresh locally:
 
 ```bash
-make nox-scan          # writes findings.json + .nox/out/ artefacts
-git diff findings.json # review the delta
+make nox-scan                # writes .nox/out/ artefacts
+git diff .nox/vex.json       # review any vex changes the operator made
 ```
 
-**Status: triage pending.** A `vex.json` document waiving each finding with explicit justification is on the roadmap; until it lands, CI does not enforce the baseline. Operators reviewing the project for production use should walk findings.json themselves.
+Each rule category is waived in `.nox/vex.json` (OpenVEX v0.2.0) with explicit `status`, `justification`, and `impact_statement`. The `security.yml` CI workflow diffs new scans against the committed baseline + vex; unbaselined findings fail the build. To accept a new finding, add a statement to `.nox/vex.json` and document the reasoning.
 
 ## Known gaps
 

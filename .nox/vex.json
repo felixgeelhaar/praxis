@@ -1,0 +1,185 @@
+{
+  "@context": "https://openvex.dev/ns/v0.2.0",
+  "@id": "https://github.com/felixgeelhaar/praxis/.nox/vex.json",
+  "author": "Felix Geelhaar",
+  "role": "maintainer",
+  "timestamp": "2026-05-02T08:00:00Z",
+  "version": 1,
+  "statements": [
+    {
+      "vulnerability": {
+        "@id": "SEC-545",
+        "name": "SEC-545",
+        "description": "Detected PagerDuty API Key (alternate)"
+      },
+      "products": [{"@id": "pkg:golang/github.com/felixgeelhaar/praxis"}],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_present",
+      "impact_statement": "All 28 hits matched the literal Go identifier 'pagerduty_create_incident' in test fixtures (capability/plugin name strings), not key values. The heuristic flags any source containing the vendor name; the matched strings have neither the entropy nor the length of an actual PagerDuty key."
+    },
+    {
+      "vulnerability": {
+        "@id": "SEC-163",
+        "name": "SEC-163",
+        "description": "High-entropy hex string detected (possible secret key)"
+      },
+      "products": [{"@id": "pkg:golang/github.com/felixgeelhaar/praxis"}],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_present",
+      "impact_statement": "All 25 hits land in go.sum (Go module checksums are SHA-256 hashes by definition), .roady/spec.lock.json (content-addressed IDs), and .goreleaser.yaml ldflags template variables. No actual key material at any hit."
+    },
+    {
+      "vulnerability": {
+        "@id": "DATA-001",
+        "name": "DATA-001",
+        "description": "Email address in code or config"
+      },
+      "products": [{"@id": "pkg:golang/github.com/felixgeelhaar/praxis"}],
+      "status": "not_affected",
+      "justification": "component_not_present",
+      "impact_statement": "21 hits across test fixtures (handler unit tests using example.com / test addresses) and .claude/settings.local.json (local Claude Code agent state — gitignored at the parent level; should be excluded once nox issue Nox-HQ/nox#38 lands respect-gitignore-by-default). No production-PII at any hit."
+    },
+    {
+      "vulnerability": {
+        "@id": "IAC-013",
+        "name": "IAC-013",
+        "description": "GitHub Action pinned to mutable tag instead of commit SHA"
+      },
+      "products": [{"@id": "pkg:golang/github.com/felixgeelhaar/praxis"}],
+      "status": "not_affected",
+      "justification": "inline_mitigations_already_exist",
+      "impact_statement": "Same trade-off mnemos and chronos accept: tag-pinning gives Dependabot a refresh path that SHA-pinning blocks. Mitigation: dependabot config (committed) auto-opens PRs on action releases so updates flow through code review rather than auto-applying. Acceptable until the action's owner ships a malicious version, at which point the mitigation kicks in."
+    },
+    {
+      "vulnerability": {
+        "@id": "SEC-161",
+        "name": "SEC-161",
+        "description": "High-entropy string in assignment (possible secret)"
+      },
+      "products": [{"@id": "pkg:golang/github.com/felixgeelhaar/praxis"}],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_present",
+      "impact_statement": "All 10 hits are test seed values (e.g. ECDSA-key generation in plugin/signature_test.go, idempotency-key fixtures). Test code; never reaches production binaries."
+    },
+    {
+      "vulnerability": {
+        "@id": "SEC-430",
+        "name": "SEC-430",
+        "description": "Detected PostgreSQL"
+      },
+      "products": [{"@id": "pkg:golang/github.com/felixgeelhaar/praxis"}],
+      "status": "not_affected",
+      "justification": "inline_mitigations_already_exist",
+      "impact_statement": "Hits .github/workflows/ci.yml services.postgres block — credentials for an ephemeral test container that lives for the duration of one workflow run. Not deployable secrets."
+    },
+    {
+      "vulnerability": {
+        "@id": "SEC-073",
+        "name": "SEC-073",
+        "description": "Database Connection String with credentials detected"
+      },
+      "products": [{"@id": "pkg:golang/github.com/felixgeelhaar/praxis"}],
+      "status": "not_affected",
+      "justification": "inline_mitigations_already_exist",
+      "impact_statement": "Same as SEC-430: ephemeral CI Postgres connection string in services block. Not a production credential."
+    },
+    {
+      "vulnerability": {
+        "@id": "IAC-254",
+        "name": "IAC-254",
+        "description": "Serverless environment variable with hardcoded secret"
+      },
+      "products": [{"@id": "pkg:golang/github.com/felixgeelhaar/praxis"}],
+      "status": "not_affected",
+      "justification": "inline_mitigations_already_exist",
+      "impact_statement": "Same as SEC-430: ephemeral CI Postgres test container env block. Not a production secret."
+    },
+    {
+      "vulnerability": {
+        "@id": "IAC-351",
+        "name": "IAC-351",
+        "description": "CI variable with hardcoded secret"
+      },
+      "products": [{"@id": "pkg:golang/github.com/felixgeelhaar/praxis"}],
+      "status": "not_affected",
+      "justification": "inline_mitigations_already_exist",
+      "impact_statement": "Same as SEC-430: ephemeral CI Postgres test variables. Not a production secret."
+    },
+    {
+      "vulnerability": {
+        "@id": "IAC-314",
+        "name": "IAC-314",
+        "description": "GHA workflow has contents write permission"
+      },
+      "products": [{"@id": "pkg:golang/github.com/felixgeelhaar/praxis"}],
+      "status": "not_affected",
+      "justification": "inline_mitigations_already_exist",
+      "impact_statement": "Hits .github/workflows/bench-publish.yml — the bench publisher legitimately needs contents:write to push the rendered docs/benchmarks.md branch. The peter-evans/create-pull-request action paired with this perm requires it; removing the perm breaks the workflow. Same accepted trade-off as mnemos and chronos."
+    },
+    {
+      "vulnerability": {
+        "@id": "IAC-315",
+        "name": "IAC-315",
+        "description": "GHA workflow has packages write permission"
+      },
+      "products": [{"@id": "pkg:golang/github.com/felixgeelhaar/praxis"}],
+      "status": "not_affected",
+      "justification": "inline_mitigations_already_exist",
+      "impact_statement": "Hits .github/workflows/release.yml — goreleaser legitimately needs packages:write to push the container image to GHCR. Required for releases; same trade-off as mnemos / chronos."
+    },
+    {
+      "vulnerability": {
+        "@id": "CONT-001",
+        "name": "CONT-001",
+        "description": "Container base image not pinned to specific digest"
+      },
+      "products": [{"@id": "pkg:golang/github.com/felixgeelhaar/praxis"}],
+      "status": "under_investigation",
+      "impact_statement": "Dockerfile uses `alpine:3.21` without a digest. Acceptable for development; production deploys should pin via `docker buildx imagetools inspect alpine:3.21` and update the FROM line with the returned sha256. Same gap mnemos has — both will pin together when their first production deploy ships. Tracking under SECURITY.md known gaps."
+    },
+    {
+      "vulnerability": {
+        "@id": "SEC-437",
+        "name": "SEC-437",
+        "description": "Detected Slack Token"
+      },
+      "products": [{"@id": "pkg:golang/github.com/felixgeelhaar/praxis"}],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_present",
+      "impact_statement": "Single hit in README.md matched the word 'Slack' adjacent to a placeholder token-shaped string in example documentation. Not a real token."
+    },
+    {
+      "vulnerability": {
+        "@id": "SEC-629",
+        "name": "SEC-629",
+        "description": "Detected LOB API Key"
+      },
+      "products": [{"@id": "pkg:golang/github.com/felixgeelhaar/praxis"}],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_present",
+      "impact_statement": "Hits in test fixtures referencing the word 'LOB'. The matched strings are not LOB API keys; the heuristic fired on substring match alone. Sister case to SEC-545 / SEC-437."
+    },
+    {
+      "vulnerability": {
+        "@id": "SEC-162",
+        "name": "SEC-162",
+        "description": "High-entropy base64 blob detected (possible encoded secret)"
+      },
+      "products": [{"@id": "pkg:golang/github.com/felixgeelhaar/praxis"}],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_present",
+      "impact_statement": "Hits in .roady/spec.lock.json (content-addressed task IDs encoded as base64). Roady project-management metadata; no secret content."
+    },
+    {
+      "vulnerability": {
+        "@id": "DATA-005",
+        "name": "DATA-005",
+        "description": "Hardcoded public IP address in configuration"
+      },
+      "products": [{"@id": "pkg:golang/github.com/felixgeelhaar/praxis"}],
+      "status": "not_affected",
+      "justification": "inline_mitigations_already_exist",
+      "impact_statement": "Hits docker-compose.yml example bindings (typically 127.0.0.1 / 0.0.0.0 / loopback ranges). Local-development examples; not deployment configuration."
+    }
+  ]
+}

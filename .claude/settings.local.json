@@ -67,7 +67,11 @@
       "Bash(gh issue create --repo Nox-HQ/nox --title 'Feature: embedding leakage detection \\(PII / secret → vector DB\\)' --body ' *)",
       "Bash(gh issue create --repo Nox-HQ/nox --title 'Feature: VS Code / JetBrains IDE extensions surfacing findings inline' --body ' *)",
       "Bash(gh issue edit 46 --repo Nox-HQ/nox --title 'Feature: multi-language embedding leakage detection \\(PII / secret → vector DB\\)' --body ' *)",
-      "Bash(gh issue *)"
+      "Bash(gh issue *)",
+      "Bash(gh run *)",
+      "Bash(git mv *)",
+      "Bash(git rm *)",
+      "Bash(git restore *)"
     ]
   }
 }
