@@ -37,6 +37,8 @@ type Config struct {
 	TLSCertFile                string        // PRAXIS_TLS_CERT_FILE; PEM-encoded cert chain. Empty disables TLS.
 	TLSKeyFile                 string        // PRAXIS_TLS_KEY_FILE; PEM-encoded private key. Required when TLSCertFile set.
 	MTLSClientCAFile           string        // PRAXIS_MTLS_CLIENT_CA_FILE; PEM CA bundle. When set, requires + verifies client certs.
+	PluginOutOfProcess         bool          // PRAXIS_PLUGIN_OUT_OF_PROCESS=1; loads plugins via ProcessOpener (real isolation, kernel-enforced limits).
+	PluginHostBinary           string        // PRAXIS_PLUGINHOST_BINARY; path to praxis-pluginhost. Required when PluginOutOfProcess is true.
 	AuditRetentionInterval     time.Duration // PRAXIS_AUDIT_RETENTION_INTERVAL; cadence between sweeps
 	AuditRetentionInitialDelay time.Duration // PRAXIS_AUDIT_RETENTION_INITIAL_DELAY; defer first sweep
 	// AuditRetention maps OrgID to retention window. The empty key is the
@@ -79,6 +81,8 @@ func Load() (Config, error) {
 		TLSCertFile:                os.Getenv("PRAXIS_TLS_CERT_FILE"),
 		TLSKeyFile:                 os.Getenv("PRAXIS_TLS_KEY_FILE"),
 		MTLSClientCAFile:           os.Getenv("PRAXIS_MTLS_CLIENT_CA_FILE"),
+		PluginOutOfProcess:         parseBool(os.Getenv("PRAXIS_PLUGIN_OUT_OF_PROCESS")),
+		PluginHostBinary:           os.Getenv("PRAXIS_PLUGINHOST_BINARY"),
 	}
 
 	switch c.DBType {
@@ -104,6 +108,9 @@ func Load() (Config, error) {
 	}
 	if c.MTLSClientCAFile != "" && c.TLSCertFile == "" {
 		return c, fmt.Errorf("PRAXIS_MTLS_CLIENT_CA_FILE: requires PRAXIS_TLS_CERT_FILE (mTLS implies TLS)")
+	}
+	if c.PluginOutOfProcess && c.PluginHostBinary == "" {
+		return c, fmt.Errorf("PRAXIS_PLUGINHOST_BINARY: required when PRAXIS_PLUGIN_OUT_OF_PROCESS=1")
 	}
 	return c, nil
 }

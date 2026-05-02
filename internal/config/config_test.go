@@ -134,6 +134,38 @@ func TestLoad_AuditRetentionInterval_Override(t *testing.T) {
 	}
 }
 
+func TestLoad_PluginOutOfProcess_DefaultsOff(t *testing.T) {
+	t.Setenv("PRAXIS_PLUGIN_OUT_OF_PROCESS", "")
+	t.Setenv("PRAXIS_PLUGINHOST_BINARY", "")
+	c, err := config.Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if c.PluginOutOfProcess {
+		t.Error("PluginOutOfProcess defaults true; want false")
+	}
+}
+
+func TestLoad_PluginOutOfProcess_RequiresHostBinary(t *testing.T) {
+	t.Setenv("PRAXIS_PLUGIN_OUT_OF_PROCESS", "1")
+	t.Setenv("PRAXIS_PLUGINHOST_BINARY", "")
+	if _, err := config.Load(); err == nil {
+		t.Error("OOP without binary path must error")
+	}
+}
+
+func TestLoad_PluginOutOfProcess_AcceptsHostBinary(t *testing.T) {
+	t.Setenv("PRAXIS_PLUGIN_OUT_OF_PROCESS", "1")
+	t.Setenv("PRAXIS_PLUGINHOST_BINARY", "/usr/local/bin/praxis-pluginhost")
+	c, err := config.Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if !c.PluginOutOfProcess || c.PluginHostBinary != "/usr/local/bin/praxis-pluginhost" {
+		t.Errorf("config=%+v", c)
+	}
+}
+
 func TestLoad_TLS_DefaultsEmpty(t *testing.T) {
 	t.Setenv("PRAXIS_TLS_CERT_FILE", "")
 	t.Setenv("PRAXIS_TLS_KEY_FILE", "")

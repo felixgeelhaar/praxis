@@ -296,12 +296,32 @@ func loadPlugins(ctx context.Context, logger *bolt.Logger, cfg config.Config, re
 		return nil, fmt.Errorf("load trusted plugin keys: %w", err)
 	}
 	var opener plugin.Opener = plugin.DefaultOpener{}
-	if cgst := cgroup.Detect(); cgst.Available {
-		// Out-of-process loader is the only path that benefits from
-		// cgroup wiring today. ProcessOpener with a CgroupParent set
-		// will create per-plugin cgroups under the delegated subtree.
-		// In-process plugins (DefaultOpener) keep the setrlimit path.
-		_ = cgst // kept available for future wiring of ProcessOpener.
+	if cfg.PluginOutOfProcess {
+		// Switch to the out-of-process loader. Each plugin runs in its
+		// own praxis-pluginhost child process; setrlimit + (when
+		// available) cgroup v2 enforce CPU + memory budgets at the
+		// kernel level. In-process plugins (DefaultOpener) keep the
+		// setrlimit-only path that ships in Phase 4. Phase 6.
+		po := &plugin.ProcessOpener{
+			Binary: cfg.PluginHostBinary,
+			Budget: plugin.ResourceBudget{
+				// Default budget surfaced from config. Per-plugin
+				// budgets via BudgetedPlugin still override.
+				CPUTimeout:     cfg.HandlerTimeout,
+				MaxMemoryBytes: 0, // unset → setrlimit path skips memory cap; cgroup path still applies its own.
+			},
+			OnUsageReport: m.recordPluginUsage,
+		}
+		if cgst := cgroup.Detect(); cgst.Available {
+			po.CgroupParent = cgst.Root
+			logger.Info().Str("cgroup_root", cgst.Root).Msg("plugin OOP loader using cgroup v2")
+		} else {
+			logger.Info().Str("reason", cgst.Reason).Msg("plugin OOP loader running with setrlimit only")
+		}
+		opener = po
+		logger.Info().Str("binary", cfg.PluginHostBinary).Msg("plugin loader: out-of-process")
+	} else {
+		logger.Info().Msg("plugin loader: in-process")
 	}
 	mgr := plugin.NewManager(plugin.ManagerConfig{
 		Dir:         cfg.PluginDir,

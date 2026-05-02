@@ -20,7 +20,7 @@ Production deployments must:
 - Configure `PRAXIS_API_TOKEN` with a cryptographically random value (≥ 32 bytes hex).
 - Configure `PRAXIS_PLUGIN_TRUSTED_KEYS` with the operator's public-key bundle. Treat the corresponding private keys as the most sensitive material in the deployment — they gate every plugin load.
 - Treat the database file (`PRAXIS_DB_CONN`) as PII-bearing — back up, encrypt at rest if the underlying engine supports it, and restrict filesystem access. Audit events stamp tenant identity (`OrgID`, `TeamID`) and policy decisions; retention windows are operator-controlled via `PRAXIS_AUDIT_RETENTION`.
-- Run plugins out-of-process when memory enforcement matters (cgroup v2 on Linux). The in-process sandbox enforces CPU timeout and HTTP egress allowlist but cannot enforce `MaxMemoryBytes` because the Go allocator is shared with the host.
+- Run plugins out-of-process when memory enforcement matters (cgroup v2 on Linux). The in-process sandbox enforces CPU timeout and HTTP egress allowlist but cannot enforce `MaxMemoryBytes` because the Go allocator is shared with the host. Switch via `PRAXIS_PLUGIN_OUT_OF_PROCESS=1` + `PRAXIS_PLUGINHOST_BINARY=/path/to/praxis-pluginhost`; cgroup v2 wiring engages automatically when a delegated subtree exists.
 
 ## Authentication surfaces
 
