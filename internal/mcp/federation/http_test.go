@@ -55,7 +55,7 @@ func (f *fakeMCPServer) handler() http.HandlerFunc {
 		}
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"jsonrpc": "2.0",
-			"id":      json.RawMessage(req.ID),
+			"id":      req.ID,
 			"result":  result,
 		})
 	}

@@ -3,8 +3,8 @@
   "@id": "https://github.com/felixgeelhaar/praxis/.nox/vex.json",
   "author": "Felix Geelhaar",
   "role": "maintainer",
-  "timestamp": "2026-05-02T10:00:00Z",
-  "version": 2,
+  "timestamp": "2026-05-02T14:30:00Z",
+  "version": 3,
   "statements": [
     {
       "vulnerability": {
@@ -191,6 +191,17 @@
       "status": "not_affected",
       "justification": "vulnerable_code_not_present",
       "impact_statement": "Both hits land in .claude/settings.local.json — Claude Code agent state for the maintainer's local IDE. The matched substrings are agent permission hashes / project IDs, not API key material. The file is gitignored at the parent dotfiles level; nox 0.7.0 does not yet honour .gitignore (Nox-HQ/nox#38) so it surfaces here. Sister case to DATA-001 in the same file."
+    },
+    {
+      "vulnerability": {
+        "@id": "SEC-082",
+        "name": "SEC-082",
+        "description": "Bearer token detected"
+      },
+      "products": [{"@id": "pkg:golang/github.com/felixgeelhaar/praxis"}],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_present",
+      "impact_statement": "Single hit in CHANGELOG.md line 21 — the v0.2.0 release-notes entry describing how the new MCP federation HTTP transport forwards 'Authorization: Bearer ...' headers. Documentation prose, not a real token; the heuristic fired on the literal phrase. Sister case to SEC-437 / SEC-545 / SEC-629."
     }
   ]
 }

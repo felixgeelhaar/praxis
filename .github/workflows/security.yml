@@ -92,7 +92,7 @@ jobs:
             exit 1
           fi
           covered=$(jq -r '.statements[].vulnerability."@id"' ./.nox/vex.json | sort -u)
-          found=$(jq -r '.[].RuleID // empty' ./.nox/out/findings.json | sort -u)
+          found=$(jq -r '.findings[].RuleID // empty' ./.nox/out/findings.json | sort -u)
           new=$(comm -23 <(echo "$found") <(echo "$covered") || true)
           if [ -n "$new" ]; then
             echo "::error::New finding categories without a VEX statement:"

@@ -85,12 +85,12 @@ func runMigrations(db *sql.DB) error {
 	for rows.Next() {
 		var n string
 		if err := rows.Scan(&n); err != nil {
-			rows.Close()
+			_ = rows.Close()
 			return err
 		}
 		applied[n] = true
 	}
-	rows.Close()
+	_ = rows.Close()
 
 	entries, err := migrationsFS.ReadDir("migrations")
 	if err != nil {
