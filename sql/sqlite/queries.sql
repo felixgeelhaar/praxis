@@ -134,3 +134,13 @@ UPDATE outcome_outbox SET delivered_at = ? WHERE id = ?;
 
 -- name: BumpOutcomeAttempt :exec
 UPDATE outcome_outbox SET attempts = attempts + 1, next_attempt = ?, last_error = ? WHERE id = ?;
+
+-- name: AppendCapabilityHistory :exec
+INSERT INTO capability_history (id, capability_name, recorded_at, prev_input_version, prev_output_version, next_input_version, next_output_version, issues)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+
+-- name: ListCapabilityHistory :many
+SELECT id, capability_name, recorded_at, prev_input_version, prev_output_version, next_input_version, next_output_version, issues
+FROM capability_history
+WHERE capability_name = ?
+ORDER BY recorded_at;

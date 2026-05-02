@@ -10,6 +10,7 @@ import (
 
 type Querier interface {
 	AppendAuditEvent(ctx context.Context, arg AppendAuditEventParams) error
+	AppendCapabilityHistory(ctx context.Context, arg AppendCapabilityHistoryParams) error
 	BumpOutcomeAttempt(ctx context.Context, arg BumpOutcomeAttemptParams) error
 	DeletePolicyRule(ctx context.Context, id string) error
 	EnqueueOutcome(ctx context.Context, arg EnqueueOutcomeParams) error
@@ -18,6 +19,7 @@ type Querier interface {
 	ListActionsPaged(ctx context.Context, limit int32) ([]ListActionsPagedRow, error)
 	ListAuditForAction(ctx context.Context, actionID string) ([]ListAuditForActionRow, error)
 	ListCapabilities(ctx context.Context) ([]ListCapabilitiesRow, error)
+	ListCapabilityHistory(ctx context.Context, capabilityName string) ([]CapabilityHistory, error)
 	ListPendingAsync(ctx context.Context, limit int32) ([]ListPendingAsyncRow, error)
 	ListPolicyRules(ctx context.Context) ([]PolicyRule, error)
 	LookupIdempotency(ctx context.Context, key string) (IdempotencyKey, error)

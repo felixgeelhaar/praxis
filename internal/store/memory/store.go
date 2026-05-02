@@ -18,13 +18,14 @@ import (
 // New returns a fully-wired in-memory ports.Repos.
 func New() *ports.Repos {
 	return &ports.Repos{
-		Capability:  newCapabilityRepo(),
-		Action:      newActionRepo(),
-		Idempotency: newIdempotencyRepo(),
-		Audit:       newAuditRepo(),
-		Policy:      newPolicyRepo(),
-		Outbox:      newOutboxRepo(),
-		Close:       func() error { return nil },
+		Capability:        newCapabilityRepo(),
+		Action:            newActionRepo(),
+		Idempotency:       newIdempotencyRepo(),
+		Audit:             newAuditRepo(),
+		Policy:            newPolicyRepo(),
+		Outbox:            newOutboxRepo(),
+		CapabilityHistory: newCapabilityHistoryRepo(),
+		Close:             func() error { return nil },
 	}
 }
 
@@ -371,4 +372,33 @@ func (r *outboxRepo) BumpAttempt(_ context.Context, id string, nextAttempt time.
 	e.LastError = lastError
 	r.entries[id] = e
 	return nil
+}
+
+// --- capability history ---
+
+type capabilityHistoryRepo struct {
+	mu      sync.RWMutex
+	entries map[string][]domain.CapabilityHistoryEntry // capability name -> entries
+}
+
+func newCapabilityHistoryRepo() *capabilityHistoryRepo {
+	return &capabilityHistoryRepo{entries: map[string][]domain.CapabilityHistoryEntry{}}
+}
+
+func (r *capabilityHistoryRepo) Append(_ context.Context, e domain.CapabilityHistoryEntry) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.entries[e.CapabilityName] = append(r.entries[e.CapabilityName], e)
+	return nil
+}
+
+func (r *capabilityHistoryRepo) ListForCapability(_ context.Context, name string) ([]domain.CapabilityHistoryEntry, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	out := make([]domain.CapabilityHistoryEntry, len(r.entries[name]))
+	copy(out, r.entries[name])
+	sort.SliceStable(out, func(i, j int) bool {
+		return out[i].RecordedAt.Before(out[j].RecordedAt)
+	})
+	return out, nil
 }

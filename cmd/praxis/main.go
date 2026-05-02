@@ -161,6 +161,9 @@ func bootstrap(ctx context.Context) (*runtime, func(), error) {
 	}
 
 	registry := capability.New()
+	if repos.CapabilityHistory != nil {
+		registry.SetHistoryRepo(repos.CapabilityHistory)
+	}
 	configureCompat(registry, cfg)
 	registerHandlers(registry)
 

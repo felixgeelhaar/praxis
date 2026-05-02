@@ -71,7 +71,9 @@
       "Bash(gh run *)",
       "Bash(git mv *)",
       "Bash(git rm *)",
-      "Bash(git restore *)"
+      "Bash(git restore *)",
+      "Bash(gh release *)",
+      "mcp__roady__roady_get_state"
     ]
   }
 }

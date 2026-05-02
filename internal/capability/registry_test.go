@@ -2,6 +2,7 @@ package capability_test
 
 import (
 	"context"
+	"sync"
 	"testing"
 
 	"github.com/felixgeelhaar/praxis/internal/capability"
@@ -334,4 +335,64 @@ func itoa(i int) string {
 		i /= 10
 	}
 	return string(b)
+}
+
+func TestRegistry_HistoryRepoPersistsAndReads(t *testing.T) {
+	reg := capability.New()
+	repo := newFakeHistoryRepo()
+	reg.SetHistoryRepo(repo)
+	reg.SetCompatMode(capability.CompatWarn,
+		func(_ domain.Capability, _ domain.Capability) []capability.CompatIssue {
+			return []capability.CompatIssue{{Code: "x", Field: "y", Message: "broke"}}
+		},
+		nil,
+	)
+	_ = reg.Register(&mockHandler{name: "h"})
+	_ = reg.Register(&mockHandler{name: "h"})
+	_ = reg.Register(&mockHandler{name: "h"})
+
+	if got := repo.count("h"); got != 2 {
+		t.Errorf("repo append count=%d want 2", got)
+	}
+
+	got, err := reg.HistoryFromRepo(context.Background(), "h")
+	if err != nil {
+		t.Fatalf("HistoryFromRepo: %v", err)
+	}
+	if len(got) != 2 {
+		t.Errorf("HistoryFromRepo len=%d want 2", len(got))
+	}
+	if len(got) > 0 && (len(got[0].Issues) != 1 || got[0].Issues[0].Code != "x") {
+		t.Errorf("issues=%+v", got[0].Issues)
+	}
+}
+
+type fakeHistoryRepo struct {
+	mu      sync.Mutex
+	entries map[string][]domain.CapabilityHistoryEntry
+}
+
+func newFakeHistoryRepo() *fakeHistoryRepo {
+	return &fakeHistoryRepo{entries: map[string][]domain.CapabilityHistoryEntry{}}
+}
+
+func (r *fakeHistoryRepo) Append(_ context.Context, e domain.CapabilityHistoryEntry) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.entries[e.CapabilityName] = append(r.entries[e.CapabilityName], e)
+	return nil
+}
+
+func (r *fakeHistoryRepo) ListForCapability(_ context.Context, name string) ([]domain.CapabilityHistoryEntry, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	out := make([]domain.CapabilityHistoryEntry, len(r.entries[name]))
+	copy(out, r.entries[name])
+	return out, nil
+}
+
+func (r *fakeHistoryRepo) count(name string) int {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return len(r.entries[name])
 }

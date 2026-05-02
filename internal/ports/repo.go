@@ -52,3 +52,12 @@ type PolicyRepo interface {
 	UpsertRule(ctx context.Context, r domain.PolicyRule) error
 	DeleteRule(ctx context.Context, id string) error
 }
+
+// CapabilityHistoryRepo persists the per-capability changelog the
+// registry's compat checker writes when a re-registration introduces
+// breaking changes. Phase 6 — replaces the in-memory implementation
+// from Phase 5 so the audit-of-schema-drift survives restarts.
+type CapabilityHistoryRepo interface {
+	Append(ctx context.Context, e domain.CapabilityHistoryEntry) error
+	ListForCapability(ctx context.Context, name string) ([]domain.CapabilityHistoryEntry, error)
+}

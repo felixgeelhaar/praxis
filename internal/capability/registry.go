@@ -2,12 +2,15 @@ package capability
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"sync"
 	"time"
 
 	"github.com/felixgeelhaar/praxis/internal/domain"
+	"github.com/felixgeelhaar/praxis/internal/ports"
 )
 
 var (
@@ -107,7 +110,17 @@ type Registry struct {
 	compatChecker CompatChecker
 	onBreak       func(capName string, issues []CompatIssue)
 	history       map[string][]HistoryEntry
+	historyRepo   ports.CapabilityHistoryRepo
 	clock         func() time.Time
+}
+
+// SetHistoryRepo wires a persistent backend for capability change history.
+// When set, every recorded HistoryEntry is also appended to the repo.
+// History readers prefer the repo when available.
+func (r *Registry) SetHistoryRepo(repo ports.CapabilityHistoryRepo) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.historyRepo = repo
 }
 
 func New() *Registry {
@@ -132,6 +145,38 @@ func (r *Registry) History(name string) []HistoryEntry {
 	out := make([]HistoryEntry, len(r.history[name]))
 	copy(out, r.history[name])
 	return out
+}
+
+// HistoryFromRepo returns the persisted breaking-change log for a
+// capability when a repo is configured, falling back to the in-memory
+// log otherwise. Phase 6 t-changelog-persist.
+func (r *Registry) HistoryFromRepo(ctx context.Context, name string) ([]HistoryEntry, error) {
+	r.mu.RLock()
+	repo := r.historyRepo
+	r.mu.RUnlock()
+	if repo == nil {
+		return r.History(name), nil
+	}
+	rows, err := repo.ListForCapability(ctx, name)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]HistoryEntry, 0, len(rows))
+	for _, row := range rows {
+		issues := make([]CompatIssue, 0, len(row.Issues))
+		for _, i := range row.Issues {
+			issues = append(issues, CompatIssue{Code: i.Code, Field: i.Field, Message: i.Message})
+		}
+		out = append(out, HistoryEntry{
+			At:                row.RecordedAt,
+			PrevInputVersion:  row.PrevInputVersion,
+			PrevOutputVersion: row.PrevOutputVersion,
+			NextInputVersion:  row.NextInputVersion,
+			NextOutputVersion: row.NextOutputVersion,
+			Issues:            issues,
+		})
+	}
+	return out, nil
 }
 
 // SetCompatMode configures the schema compatibility check applied at
@@ -159,14 +204,33 @@ func (r *Registry) Register(h Handler) error {
 				if r.onBreak != nil {
 					r.onBreak(h.Name(), issues)
 				}
-				r.history[h.Name()] = append(r.history[h.Name()], HistoryEntry{
+				entry := HistoryEntry{
 					At:                r.clock(),
 					PrevInputVersion:  prev.InputSchemaVersion,
 					PrevOutputVersion: prev.OutputSchemaVersion,
 					NextInputVersion:  desc.InputSchemaVersion,
 					NextOutputVersion: desc.OutputSchemaVersion,
 					Issues:            issues,
-				})
+				}
+				r.history[h.Name()] = append(r.history[h.Name()], entry)
+				if r.historyRepo != nil {
+					domainIssues := make([]domain.CapabilityHistoryIssue, 0, len(issues))
+					for _, i := range issues {
+						domainIssues = append(domainIssues, domain.CapabilityHistoryIssue{
+							Code: i.Code, Field: i.Field, Message: i.Message,
+						})
+					}
+					_ = r.historyRepo.Append(context.Background(), domain.CapabilityHistoryEntry{
+						ID:                newHistoryID(),
+						CapabilityName:    h.Name(),
+						RecordedAt:        entry.At,
+						PrevInputVersion:  entry.PrevInputVersion,
+						PrevOutputVersion: entry.PrevOutputVersion,
+						NextInputVersion:  entry.NextInputVersion,
+						NextOutputVersion: entry.NextOutputVersion,
+						Issues:            domainIssues,
+					})
+				}
 				if r.compatMode == CompatStrict {
 					return fmt.Errorf("%w: %s introduces %d issue(s)", ErrIncompatibleSchema, h.Name(), len(issues))
 				}
@@ -312,6 +376,14 @@ func (r *Registry) GetCapabilityForCaller(name string, caller domain.CallerRef) 
 		return c, nil
 	}
 	return domain.Capability{}, ErrUnknownCapability
+}
+
+func newHistoryID() string {
+	var b [16]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		return fmt.Sprintf("hist-%d", time.Now().UnixNano())
+	}
+	return "hist-" + hex.EncodeToString(b[:])
 }
 
 func describe(h Handler) domain.Capability {

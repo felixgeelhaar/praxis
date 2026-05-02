@@ -42,6 +42,36 @@ func (q *Queries) AppendAuditEvent(ctx context.Context, arg AppendAuditEventPara
 	return err
 }
 
+const appendCapabilityHistory = `-- name: AppendCapabilityHistory :exec
+INSERT INTO capability_history (id, capability_name, recorded_at, prev_input_version, prev_output_version, next_input_version, next_output_version, issues)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+`
+
+type AppendCapabilityHistoryParams struct {
+	ID                string `json:"id"`
+	CapabilityName    string `json:"capability_name"`
+	RecordedAt        string `json:"recorded_at"`
+	PrevInputVersion  string `json:"prev_input_version"`
+	PrevOutputVersion string `json:"prev_output_version"`
+	NextInputVersion  string `json:"next_input_version"`
+	NextOutputVersion string `json:"next_output_version"`
+	Issues            string `json:"issues"`
+}
+
+func (q *Queries) AppendCapabilityHistory(ctx context.Context, arg AppendCapabilityHistoryParams) error {
+	_, err := q.db.ExecContext(ctx, appendCapabilityHistory,
+		arg.ID,
+		arg.CapabilityName,
+		arg.RecordedAt,
+		arg.PrevInputVersion,
+		arg.PrevOutputVersion,
+		arg.NextInputVersion,
+		arg.NextOutputVersion,
+		arg.Issues,
+	)
+	return err
+}
+
 const bumpOutcomeAttempt = `-- name: BumpOutcomeAttempt :exec
 UPDATE outcome_outbox SET attempts = attempts + 1, next_attempt = ?, last_error = ? WHERE id = ?
 `
@@ -333,6 +363,45 @@ func (q *Queries) ListCapabilities(ctx context.Context) ([]ListCapabilitiesRow, 
 			&i.Simulatable,
 			&i.Idempotent,
 			&i.RegisteredAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listCapabilityHistory = `-- name: ListCapabilityHistory :many
+SELECT id, capability_name, recorded_at, prev_input_version, prev_output_version, next_input_version, next_output_version, issues
+FROM capability_history
+WHERE capability_name = ?
+ORDER BY recorded_at
+`
+
+func (q *Queries) ListCapabilityHistory(ctx context.Context, capabilityName string) ([]CapabilityHistory, error) {
+	rows, err := q.db.QueryContext(ctx, listCapabilityHistory, capabilityName)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []CapabilityHistory
+	for rows.Next() {
+		var i CapabilityHistory
+		if err := rows.Scan(
+			&i.ID,
+			&i.CapabilityName,
+			&i.RecordedAt,
+			&i.PrevInputVersion,
+			&i.PrevOutputVersion,
+			&i.NextInputVersion,
+			&i.NextOutputVersion,
+			&i.Issues,
 		); err != nil {
 			return nil, err
 		}

@@ -32,11 +32,12 @@ type OutboxEnvelope struct {
 // returns a fully-wired *Repos. The executor and other layers depend only
 // on these interfaces.
 type Repos struct {
-	Capability  CapabilityRepo
-	Action      ActionRepo
-	Idempotency IdempotencyRepo
-	Audit       AuditRepo
-	Policy      PolicyRepo
-	Outbox      OutboxRepo
-	Close       func() error
+	Capability        CapabilityRepo
+	Action            ActionRepo
+	Idempotency       IdempotencyRepo
+	Audit             AuditRepo
+	Policy            PolicyRepo
+	Outbox            OutboxRepo
+	CapabilityHistory CapabilityHistoryRepo
+	Close             func() error
 }

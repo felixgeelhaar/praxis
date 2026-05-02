@@ -1,6 +1,6 @@
 {
   "project_id": "Praxis",
-  "version": 82,
+  "version": 89,
   "task_states": {
     "t-action-fsm": {
       "status": "done",
@@ -195,8 +195,10 @@
       "elapsed_minutes": 0
     },
     "t-changelog-schema": {
-      "status": "pending",
+      "status": "in_progress",
       "path": "",
+      "owner": "claude-code",
+      "started_at": "2026-05-02T11:45:01.722074+02:00",
       "elapsed_minutes": 0
     },
     "t-cli-caps-org-flag": {
@@ -484,14 +486,26 @@
       "elapsed_minutes": 60
     },
     "t-mtls-client-ca": {
-      "status": "pending",
+      "status": "done",
       "path": "",
+      "owner": "claude-code",
+      "evidence": [
+        "34ffae8"
+      ],
+      "started_at": "2026-05-02T11:22:39.466078+02:00",
+      "completed_at": "2026-05-02T11:22:46.150614+02:00",
       "elapsed_minutes": 0
     },
     "t-mtls-server": {
-      "status": "pending",
+      "status": "done",
       "path": "",
-      "elapsed_minutes": 0
+      "owner": "claude-code",
+      "evidence": [
+        "34ffae8"
+      ],
+      "started_at": "2026-05-02T11:18:09.114959+02:00",
+      "completed_at": "2026-05-02T11:22:33.563807+02:00",
+      "elapsed_minutes": 4
     },
     "t-observability": {
       "status": "done",
@@ -554,9 +568,15 @@
       "elapsed_minutes": 8
     },
     "t-out-of-process-default": {
-      "status": "pending",
+      "status": "done",
       "path": "",
-      "elapsed_minutes": 0
+      "owner": "claude-code",
+      "evidence": [
+        "a4a40ab"
+      ],
+      "started_at": "2026-05-02T11:29:27.582067+02:00",
+      "completed_at": "2026-05-02T11:32:36.930372+02:00",
+      "elapsed_minutes": 3
     },
     "t-outcome-emitter": {
       "status": "done",
@@ -897,5 +917,5 @@
       "elapsed_minutes": 0
     }
   },
-  "updated_at": "2026-05-01T23:55:53.408764+02:00"
+  "updated_at": "2026-05-02T11:45:01.722074+02:00"
 }

@@ -29,6 +29,7 @@ func RunSuite(t *testing.T, factory func(t *testing.T) *ports.Repos) {
 	t.Run("AuditRepo", func(t *testing.T) { testAuditRepo(t, factory(t)) })
 	t.Run("PolicyRepo", func(t *testing.T) { testPolicyRepo(t, factory(t)) })
 	t.Run("OutboxRepo", func(t *testing.T) { testOutboxRepo(t, factory(t)) })
+	t.Run("CapabilityHistoryRepo", func(t *testing.T) { testCapabilityHistoryRepo(t, factory(t)) })
 }
 
 func testCapabilityRepo(t *testing.T, repos *ports.Repos) {
@@ -307,5 +308,66 @@ func testOutboxRepo(t *testing.T, repos *ports.Repos) {
 	batch, _ = repos.Outbox.NextBatch(ctx, 10, now.Add(time.Hour))
 	if len(batch) != 0 {
 		t.Errorf("after MarkDelivered len=%d want 0", len(batch))
+	}
+}
+
+func testCapabilityHistoryRepo(t *testing.T, repos *ports.Repos) {
+	t.Helper()
+	if repos.CapabilityHistory == nil {
+		t.Skip("CapabilityHistory repo not wired")
+	}
+	ctx := context.Background()
+	now := time.Now().UTC().Truncate(time.Second)
+
+	entry := domain.CapabilityHistoryEntry{
+		ID:                "h-1",
+		CapabilityName:    "send_message",
+		RecordedAt:        now,
+		PrevInputVersion:  "1",
+		PrevOutputVersion: "1",
+		NextInputVersion:  "2",
+		NextOutputVersion: "1",
+		Issues: []domain.CapabilityHistoryIssue{
+			{Code: "field_removed", Field: "to", Message: "removed required field"},
+		},
+	}
+	if err := repos.CapabilityHistory.Append(ctx, entry); err != nil {
+		t.Fatalf("Append: %v", err)
+	}
+
+	entry2 := entry
+	entry2.ID = "h-2"
+	entry2.RecordedAt = now.Add(time.Second)
+	entry2.NextInputVersion = "3"
+	entry2.Issues = []domain.CapabilityHistoryIssue{
+		{Code: "type_changed", Field: "body", Message: "string -> int"},
+	}
+	if err := repos.CapabilityHistory.Append(ctx, entry2); err != nil {
+		t.Fatalf("Append 2: %v", err)
+	}
+
+	got, err := repos.CapabilityHistory.ListForCapability(ctx, "send_message")
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("len=%d want 2", len(got))
+	}
+	if got[0].ID != "h-1" || got[1].ID != "h-2" {
+		t.Errorf("order=%s,%s want h-1,h-2", got[0].ID, got[1].ID)
+	}
+	if len(got[0].Issues) != 1 || got[0].Issues[0].Code != "field_removed" {
+		t.Errorf("issues[0]=%+v", got[0].Issues)
+	}
+	if got[1].NextInputVersion != "3" {
+		t.Errorf("NextInputVersion=%q want 3", got[1].NextInputVersion)
+	}
+
+	other, err := repos.CapabilityHistory.ListForCapability(ctx, "no_such_cap")
+	if err != nil {
+		t.Fatalf("List other: %v", err)
+	}
+	if len(other) != 0 {
+		t.Errorf("other len=%d want 0", len(other))
 	}
 }

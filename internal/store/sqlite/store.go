@@ -59,13 +59,14 @@ func Open(_ context.Context, logger *bolt.Logger, conn string) (*ports.Repos, er
 
 	q := sqlcgen.New(db)
 	return &ports.Repos{
-		Capability:  &capabilityAdapter{q: q},
-		Action:      &actionAdapter{q: q},
-		Idempotency: &idempotencyAdapter{q: q},
-		Audit:       &auditAdapter{q: q, db: db},
-		Policy:      &policyAdapter{q: q},
-		Outbox:      &outboxAdapter{q: q},
-		Close:       db.Close,
+		Capability:        &capabilityAdapter{q: q},
+		Action:            &actionAdapter{q: q},
+		Idempotency:       &idempotencyAdapter{q: q},
+		Audit:             &auditAdapter{q: q, db: db},
+		Policy:            &policyAdapter{q: q},
+		Outbox:            &outboxAdapter{q: q},
+		CapabilityHistory: &capabilityHistoryAdapter{q: q},
+		Close:             db.Close,
 	}, nil
 }
 
@@ -650,4 +651,48 @@ func (a *outboxAdapter) BumpAttempt(ctx context.Context, id string, nextAttempt 
 		NextAttempt: formatTS(nextAttempt),
 		LastError:   nullStr(lastError),
 	})
+}
+
+// --- capability history adapter ---
+
+type capabilityHistoryAdapter struct{ q *sqlcgen.Queries }
+
+func (a *capabilityHistoryAdapter) Append(ctx context.Context, e domain.CapabilityHistoryEntry) error {
+	if e.RecordedAt.IsZero() {
+		e.RecordedAt = time.Now()
+	}
+	return a.q.AppendCapabilityHistory(ctx, sqlcgen.AppendCapabilityHistoryParams{
+		ID:                e.ID,
+		CapabilityName:    e.CapabilityName,
+		RecordedAt:        formatTS(e.RecordedAt),
+		PrevInputVersion:  e.PrevInputVersion,
+		PrevOutputVersion: e.PrevOutputVersion,
+		NextInputVersion:  e.NextInputVersion,
+		NextOutputVersion: e.NextOutputVersion,
+		Issues:            mustJSON(e.Issues),
+	})
+}
+
+func (a *capabilityHistoryAdapter) ListForCapability(ctx context.Context, name string) ([]domain.CapabilityHistoryEntry, error) {
+	rows, err := a.q.ListCapabilityHistory(ctx, name)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]domain.CapabilityHistoryEntry, 0, len(rows))
+	for _, r := range rows {
+		ts, _ := parseTS(r.RecordedAt)
+		var issues []domain.CapabilityHistoryIssue
+		_ = json.Unmarshal([]byte(r.Issues), &issues)
+		out = append(out, domain.CapabilityHistoryEntry{
+			ID:                r.ID,
+			CapabilityName:    r.CapabilityName,
+			RecordedAt:        ts,
+			PrevInputVersion:  r.PrevInputVersion,
+			PrevOutputVersion: r.PrevOutputVersion,
+			NextInputVersion:  r.NextInputVersion,
+			NextOutputVersion: r.NextOutputVersion,
+			Issues:            issues,
+		})
+	}
+	return out, nil
 }

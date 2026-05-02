@@ -53,6 +53,17 @@ type Capability struct {
 	OutputSchemaVersion string         `json:"output_schema_version"`
 }
 
+type CapabilityHistory struct {
+	ID                string `json:"id"`
+	CapabilityName    string `json:"capability_name"`
+	RecordedAt        string `json:"recorded_at"`
+	PrevInputVersion  string `json:"prev_input_version"`
+	PrevOutputVersion string `json:"prev_output_version"`
+	NextInputVersion  string `json:"next_input_version"`
+	NextOutputVersion string `json:"next_output_version"`
+	Issues            string `json:"issues"`
+}
+
 type IdempotencyKey struct {
 	Key       string         `json:"key"`
 	ActionID  string         `json:"action_id"`

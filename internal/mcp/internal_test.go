@@ -109,12 +109,12 @@ func TestFirstNonEmpty(t *testing.T) {
 
 func TestBuildCapDescription_FullDescriptor(t *testing.T) {
 	c := domain.Capability{
-		Name:         "echo",
-		Description:  "Echoes input.",
-		InputSchema:  map[string]any{"type": "object"},
-		Permissions:  []string{"echo:write"},
-		Simulatable:  true,
-		Idempotent:   true,
+		Name:        "echo",
+		Description: "Echoes input.",
+		InputSchema: map[string]any{"type": "object"},
+		Permissions: []string{"echo:write"},
+		Simulatable: true,
+		Idempotent:  true,
 	}
 	desc := buildCapDescription(c)
 	if !contains(desc, "Echoes input.") {

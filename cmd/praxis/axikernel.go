@@ -227,9 +227,14 @@ func newMux(deps kernelDeps, m *metrics) *http.ServeMux {
 
 	mux.Handle("GET /v1/capabilities/{name}/changelog", traced(authed(func(w http.ResponseWriter, r *http.Request) {
 		name := r.PathValue("name")
+		entries, err := deps.registry.HistoryFromRepo(r.Context(), name)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, errResponse(err.Error()))
+			return
+		}
 		writeJSON(w, http.StatusOK, map[string]any{
 			"name":    name,
-			"entries": deps.registry.History(name),
+			"entries": entries,
 		})
 	})))
 
