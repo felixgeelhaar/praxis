@@ -50,6 +50,11 @@ archives:
       - goos: windows
         formats:
           - zip
+    # praxis-pluginhost only builds for linux + darwin (Go's plugin
+    # package limitation); windows archives ship just the praxis
+    # binary. Allow the count mismatch instead of forking the
+    # archive into two ID families.
+    allow_different_binary_count: true
     name_template: >-
       {{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}
     files:
