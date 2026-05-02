@@ -6,6 +6,14 @@ Releases are tagged and published via tag-triggered CI; this file is the human-r
 
 ## [Unreleased]
 
+### Planned — Phase 6
+
+See [docs/backlog.md](docs/backlog.md). Highlights: MCP federation HTTP transport once mcp-go ships it, Sigstore Fulcio keyless plugin verification, in-process mTLS on the HTTP API, out-of-process loader as a config flag, persistent capability changelog, security CI gate via OpenVEX.
+
+## [0.1.0] — 2026-05-02
+
+First tagged release. Covers Phases 1–5 of the roadmap.
+
 ### Added — Phase 5 (production-grade observability + federation)
 
 - **OpenTelemetry tracing**: tracer provider bootstrap with OTLP/gRPC + OTLP/HTTP exporters wired via `PRAXIS_OTLP_ENDPOINT`, `PRAXIS_OTLP_PROTOCOL`, `PRAXIS_OTLP_INSECURE`, `PRAXIS_TRACE_SAMPLE`. `executor.Execute / DryRun / Resume / Revert` open root spans with `praxis.action.id`, `praxis.capability`, `praxis.outcome`, tenant scopes; `handler.<capability>` child span captures vendor latency. Sandbox HTTP client wraps `otelhttp.NewTransport` so outbound vendor calls carry W3C `traceparent`. Per-tool spans on the MCP surface.

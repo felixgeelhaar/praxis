@@ -63,22 +63,26 @@ archives:
       - CHANGELOG.md
       - SECURITY.md
 
-brews:
-  - ids:
-      - bundles
-    repository:
-      owner: felixgeelhaar
-      name: homebrew-tap
-      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
-    directory: Formula
-    homepage: https://github.com/felixgeelhaar/praxis
-    description: "Praxis — execution layer of the Mnemos/Chronos/Nous/Praxis cognitive stack"
-    license: MIT
-    install: |
-      bin.install "praxis"
-      bin.install "praxis-pluginhost"
-    test: |
-      system bin/"praxis", "version"
+# Homebrew tap publishing is disabled until felixgeelhaar/homebrew-tap
+# is created and HOMEBREW_TAP_GITHUB_TOKEN is wired into the repo's
+# Actions secrets. Re-enable by uncommenting once both exist.
+#
+# brews:
+#   - ids:
+#       - bundles
+#     repository:
+#       owner: felixgeelhaar
+#       name: homebrew-tap
+#       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+#     directory: Formula
+#     homepage: https://github.com/felixgeelhaar/praxis
+#     description: "Praxis — execution layer of the Mnemos/Chronos/Nous/Praxis cognitive stack"
+#     license: MIT
+#     install: |
+#       bin.install "praxis"
+#       bin.install "praxis-pluginhost"
+#     test: |
+#       system bin/"praxis", "version"
 
 dockers:
   - image_templates:
