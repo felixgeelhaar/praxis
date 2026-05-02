@@ -163,86 +163,42 @@ $ ./bin/praxis run send_email \
     there's only one path to diverge from.
   </p>
 
-  <div class="diagram">
-<svg viewBox="0 0 920 400" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="13" role="img" aria-labelledby="praxis-arch-title praxis-arch-desc">
-  <title id="praxis-arch-title">Praxis execution flow</title>
-  <desc id="praxis-arch-desc">Callers (Nous, agent, CLI, MCP) hit the executor; the executor runs validate, policy, idempotency, then dispatches to the registered handler; results flow to the caller while audit + Mnemos outbox capture the lifecycle.</desc>
-  <style>
-    .box { fill: #14181d; stroke: #2a323d; stroke-width: 1; }
-    .box-accent { stroke: #7ad1ff; }
-    .box-warm { stroke: #ffb86b; }
-    .label { fill: #e6e8eb; }
-    .label-dim { fill: #8a93a0; font-size: 11px; }
-    .label-accent { fill: #7ad1ff; }
-    .label-warm { fill: #ffb86b; }
-    .arrow { stroke: #4a5562; stroke-width: 1.5; fill: none; }
-    .arrow-accent { stroke: #7ad1ff; stroke-width: 1.5; fill: none; }
-    @media (prefers-color-scheme: light) {
-      .box { fill: #ffffff; stroke: #d1d5db; }
-      .box-accent { stroke: #0066b3; }
-      .box-warm { stroke: #b04400; }
-      .label { fill: #131720; }
-      .label-dim { fill: #5a6272; }
-      .label-accent { fill: #0066b3; }
-      .label-warm { fill: #b04400; }
-      .arrow { stroke: #9aa3af; }
-      .arrow-accent { stroke: #0066b3; }
-    }
-  </style>
-  <defs>
-    <marker id="ah4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
-      <path d="M 0 0 L 10 5 L 0 10 z" fill="#4a5562"/>
-    </marker>
-    <marker id="aha4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
-      <path d="M 0 0 L 10 5 L 0 10 z" fill="#7ad1ff"/>
-    </marker>
-  </defs>
+  <div class="diagram" role="img" aria-label="Praxis execution flow: callers hit the executor; the executor runs validate, policy, idempotency, then dispatches to the registered handler; results flow to the caller while the audit log and Mnemos outbox capture the lifecycle.">
+    <div class="pipe">
+      <div class="pipe-cell">
+        <span class="pipe-kicker">callers</span>
+        <p class="pipe-title">Nous · agent · CLI · MCP</p>
+        <p class="pipe-sub">all hit the same executor</p>
+      </div>
+      <div class="pipe-cell accent">
+        <span class="pipe-kicker">executor</span>
+        <p class="pipe-title">validate → policy → idempotency → run</p>
+        <p class="pipe-sub">capability registry · JSON Schema · DryRun parity</p>
+      </div>
+      <div class="pipe-cell">
+        <span class="pipe-kicker">side effects</span>
+        <p class="pipe-title">vendor</p>
+        <p class="pipe-sub">slack · smtp · github · http_request</p>
+      </div>
+      <div class="pipe-cell accent">
+        <span class="pipe-kicker">audit + outbox</span>
+        <p class="pipe-title">replay-from-audit</p>
+        <p class="pipe-sub">received → … → terminal · Mnemos outcome</p>
+      </div>
+    </div>
 
-  <text class="label-dim" x="100" y="40" text-anchor="middle">callers</text>
-  <rect class="box" x="20" y="60" width="160" height="50" rx="6"/>
-  <text class="label" x="100" y="82" text-anchor="middle">Nous · agent</text>
-  <text class="label-dim" x="100" y="98" text-anchor="middle">/v1/actions</text>
-  <rect class="box" x="20" y="130" width="160" height="50" rx="6"/>
-  <text class="label" x="100" y="152" text-anchor="middle">CLI · ./bin/praxis</text>
-  <text class="label-dim" x="100" y="168" text-anchor="middle">caps · run · log</text>
-  <rect class="box" x="20" y="200" width="160" height="50" rx="6"/>
-  <text class="label" x="100" y="222" text-anchor="middle">MCP federation</text>
-  <text class="label-dim" x="100" y="238" text-anchor="middle">tool calls</text>
+    <div class="pipe-band accent">
+      <h4>Three verbs only</h4>
+      <p><code>ListCapabilities</code> · <code>Execute</code> · <code>DryRun</code>. The public surface never expands. Everything else is a capability handler behind the registry.</p>
+    </div>
 
-  <text class="label-accent" x="430" y="40" text-anchor="middle">executor (one path)</text>
-  <rect class="box box-accent" x="270" y="60" width="320" height="190" rx="10"/>
-  <text class="label-accent" x="430" y="90" text-anchor="middle" font-size="15" font-weight="bold">validate · policy · idempotency · run</text>
-  <text class="label-dim" x="430" y="115" text-anchor="middle">capability registry · JSON Schema</text>
-  <text class="label-dim" x="430" y="135" text-anchor="middle">policy modes: enforce · log · off</text>
-  <text class="label-dim" x="430" y="155" text-anchor="middle">idempotency keeper · vendor key forward</text>
-  <text class="label-dim" x="430" y="180" text-anchor="middle">handlers: slack · email · github · linear</text>
-  <text class="label-dim" x="430" y="200" text-anchor="middle">  http_request · calendar · sigstore plugins</text>
-  <text class="label-dim" x="430" y="225" text-anchor="middle">replay-from-audit canary on every commit</text>
-
-  <text class="label-warm" x="780" y="40" text-anchor="middle">side effects + audit</text>
-  <rect class="box box-warm" x="700" y="60" width="180" height="50" rx="6"/>
-  <text class="label-warm" x="790" y="82" text-anchor="middle">vendor</text>
-  <text class="label-dim" x="790" y="98" text-anchor="middle">slack · smtp · github api</text>
-  <rect class="box box-warm" x="700" y="130" width="180" height="50" rx="6"/>
-  <text class="label-warm" x="790" y="152" text-anchor="middle">audit log</text>
-  <text class="label-dim" x="790" y="168" text-anchor="middle">received → … → terminal</text>
-  <rect class="box box-warm" x="700" y="200" width="180" height="50" rx="6"/>
-  <text class="label-warm" x="790" y="222" text-anchor="middle">Mnemos outbox</text>
-  <text class="label-dim" x="790" y="238" text-anchor="middle">outcome events</text>
-
-  <path class="arrow" d="M 180 85 L 270 90" marker-end="url(#ah4)"/>
-  <path class="arrow" d="M 180 155 L 270 155" marker-end="url(#ah4)"/>
-  <path class="arrow" d="M 180 225 L 270 220" marker-end="url(#ah4)"/>
-
-  <path class="arrow-accent" d="M 590 85 L 700 85" marker-end="url(#aha4)"/>
-  <path class="arrow-accent" d="M 590 155 L 700 155" marker-end="url(#aha4)"/>
-  <path class="arrow-accent" d="M 590 225 L 700 225" marker-end="url(#aha4)"/>
-
-  <rect class="box" x="20" y="290" width="880" height="80" rx="8"/>
-  <text class="label-dim" x="60" y="316">Three verbs only: <tspan font-family="ui-monospace,Menlo">ListCapabilities</tspan> · <tspan font-family="ui-monospace,Menlo">Execute</tspan> · <tspan font-family="ui-monospace,Menlo">DryRun</tspan>.</text>
-  <text class="label-dim" x="60" y="338">Storage: SQLite (default) · Postgres · in-memory. Auth: bearer · JWT · OIDC. Tracing: OpenTelemetry.</text>
-  <text class="label-dim" x="60" y="358">Plugins: Go-plugin host with sigstore verification — out-of-tree handlers without rebuilding the binary.</text>
-</svg>
+    <div class="pipe-band">
+      <div class="row">
+        <strong>Storage</strong><span>SQLite (default) · Postgres · in-memory</span>
+        <strong>Auth</strong><span>bearer · JWT · OIDC · OpenTelemetry traces</span>
+        <strong>Plugins</strong><span>Go-plugin host with sigstore verification — out-of-tree handlers without rebuilding the binary</span>
+      </div>
+    </div>
   </div>
 </section>
 
