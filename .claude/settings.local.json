@@ -80,7 +80,8 @@
       "Bash(sed -i '' -e 's/mu: newFakeMu\\(\\),//g' -e 's/mu:       newFakeMu\\(\\),//g' -e 's/mu:   newFakeMu\\(\\),//g' -e 's/mu:     newFakeMu\\(\\),//g' client/http_test.go)",
       "Bash(gh pr create --title 'feat\\(client\\): HTTP transport for client-side JSON-RPC' --body ' *)",
       "Bash(gh pr *)",
-      "Bash(grep -nA 25 \"func runMigrations\" /Users/felixgeelhaar/Developer/projects/business-felix-geelhaar/praxis/internal/store/postgres/store.go)"
+      "Bash(grep -nA 25 \"func runMigrations\" /Users/felixgeelhaar/Developer/projects/business-felix-geelhaar/praxis/internal/store/postgres/store.go)",
+      "Bash(curl -sfL https://raw.githubusercontent.com/sigstore/root-signing/main/targets/fulcio_v1.crt.pem)"
     ]
   }
 }

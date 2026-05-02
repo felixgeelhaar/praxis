@@ -26,6 +26,7 @@ import (
 func main() {
 	artifact := flag.String("artifact", "", "path to the artefact to verify")
 	root := flag.String("fulcio-root", "", "path to a PEM bundle of trusted Fulcio roots")
+	intermediate := flag.String("fulcio-intermediate", "", "optional path to a PEM bundle of Fulcio intermediates")
 	subject := flag.String("subject-glob", "", "allowed SAN glob")
 	issuer := flag.String("issuer", "", "OIDC issuer")
 	flag.Parse()
@@ -40,8 +41,17 @@ func main() {
 		fmt.Fprintln(os.Stderr, "load roots:", err)
 		os.Exit(1)
 	}
+	var intermediates []*x509.Certificate
+	if *intermediate != "" {
+		intermediates, err = plugin.LoadFulcioRoots([]string{*intermediate})
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "load intermediates:", err)
+			os.Exit(1)
+		}
+	}
 	v := plugin.KeylessVerifier{
-		FulcioRoots: roots,
+		FulcioRoots:   roots,
+		Intermediates: intermediates,
 		TrustedIdentities: []plugin.Identity{{
 			SubjectGlob: *subject,
 			Issuer:      *issuer,

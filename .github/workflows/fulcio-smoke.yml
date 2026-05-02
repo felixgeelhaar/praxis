@@ -47,20 +47,23 @@ jobs:
             --output-certificate /tmp/plugin/plugin.so.cert \
             /tmp/plugin/plugin.so
 
-      - name: Fetch production Fulcio root
+      - name: Fetch production Fulcio root + intermediate
         run: |
-          # Sigstore-published root pinned to the production Fulcio CA.
-          # Path is `targets/fulcio_v1.crt.pem` on the root-signing
-          # repo's main branch (the legacy "repository/repository/..."
-          # path 404s as of 2026).
-          curl -fsSL -o /tmp/fulcio_v1.crt.pem \
-            https://raw.githubusercontent.com/sigstore/root-signing/main/targets/fulcio_v1.crt.pem
-          test -s /tmp/fulcio_v1.crt.pem
+          # Production Fulcio leaves are issued by the intermediate,
+          # not the root. The verifier wants the self-signed root in
+          # FulcioRoots and the intermediate in Intermediates so x509
+          # chain verification builds a valid path.
+          base="https://raw.githubusercontent.com/sigstore/root-signing/main/targets"
+          curl -fsSL -o /tmp/fulcio_root.pem "${base}/fulcio_v1.crt.pem"
+          curl -fsSL -o /tmp/fulcio_intermediate.pem "${base}/fulcio_intermediate_v1.crt.pem"
+          test -s /tmp/fulcio_root.pem
+          test -s /tmp/fulcio_intermediate.pem
 
       - name: Run praxis VerifyKeyless against the signed artefact
         run: |
           go run ./cmd/fulcio-smoke \
             --artifact /tmp/plugin/plugin.so \
-            --fulcio-root /tmp/fulcio_v1.crt.pem \
+            --fulcio-root /tmp/fulcio_root.pem \
+            --fulcio-intermediate /tmp/fulcio_intermediate.pem \
             --subject-glob "https://github.com/${GITHUB_REPOSITORY}/*" \
             --issuer "https://token.actions.githubusercontent.com"
