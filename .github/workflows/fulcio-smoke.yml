@@ -49,10 +49,12 @@ jobs:
 
       - name: Fetch production Fulcio root
         run: |
-          # Sigstore-published TUF root pinned to the production
-          # Fulcio CA. https://docs.sigstore.dev/system_config/public_deployment/
+          # Sigstore-published root pinned to the production Fulcio CA.
+          # Path is `targets/fulcio_v1.crt.pem` on the root-signing
+          # repo's main branch (the legacy "repository/repository/..."
+          # path 404s as of 2026).
           curl -fsSL -o /tmp/fulcio_v1.crt.pem \
-            https://raw.githubusercontent.com/sigstore/root-signing/main/repository/repository/targets/fulcio_v1.crt.pem
+            https://raw.githubusercontent.com/sigstore/root-signing/main/targets/fulcio_v1.crt.pem
           test -s /tmp/fulcio_v1.crt.pem
 
       - name: Run praxis VerifyKeyless against the signed artefact
