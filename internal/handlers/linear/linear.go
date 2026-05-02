@@ -263,7 +263,7 @@ func graphQL(ctx context.Context, cfg Config, query string, variables map[string
 	if err != nil {
 		return fmt.Errorf("linear: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	raw, _ := io.ReadAll(resp.Body)
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		base := fmt.Errorf("linear HTTP %d: %s", resp.StatusCode, string(raw))

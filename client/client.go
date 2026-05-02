@@ -60,6 +60,7 @@ func New(baseURL string, opts ...Option) *Client {
 	c := &Client{
 		baseURL: strings.TrimRight(baseURL, "/"),
 		http:    &http.Client{Timeout: 30 * time.Second},
+		//nolint:bodyclose // factory is constructing a retry strategy, not making an HTTP call.
 		retry: retry.New[*http.Response](retry.Config{
 			MaxAttempts:   3,
 			InitialDelay:  200 * time.Millisecond,
@@ -115,9 +116,9 @@ func (c *Client) ListCapabilities(ctx context.Context) ([]domain.Capability, err
 
 // GetCapability fetches a single capability by name.
 func (c *Client) GetCapability(ctx context.Context, name string) (domain.Capability, error) {
-	var cap domain.Capability
-	err := c.do(ctx, http.MethodGet, "/v1/capabilities/"+name, nil, &cap)
-	return cap, err
+	var capDesc domain.Capability
+	err := c.do(ctx, http.MethodGet, "/v1/capabilities/"+name, nil, &capDesc)
+	return capDesc, err
 }
 
 // Execute submits an action for synchronous execution.
@@ -176,8 +177,8 @@ func (c *Client) do(ctx context.Context, method, path string, body, out any) err
 			return nil, err
 		}
 		if r.StatusCode >= 400 {
-			defer r.Body.Close()
 			b, _ := io.ReadAll(r.Body)
+			_ = r.Body.Close()
 			msg := strings.TrimSpace(string(b))
 			return nil, &APIError{Status: r.StatusCode, Message: msg}
 		}
@@ -189,7 +190,7 @@ func (c *Client) do(ctx context.Context, method, path string, body, out any) err
 		}
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if out != nil {
 		if err := json.NewDecoder(resp.Body).Decode(out); err != nil {
 			return fmt.Errorf("praxis: decode response: %w", err)

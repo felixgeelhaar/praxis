@@ -21,6 +21,9 @@ import (
 	"github.com/felixgeelhaar/praxis/internal/ports"
 	"github.com/felixgeelhaar/praxis/internal/store/sqlite/sqlcgen"
 
+	// modernc.org/sqlite is registered as the "sqlite" sql/driver via
+	// its package init. We never reference it by name; the blank
+	// import exists solely to wire driver registration.
 	_ "modernc.org/sqlite"
 )
 

@@ -38,3 +38,4 @@ bench/current.txt
 # nox scan artefacts. findings.json (at repo root) IS committed (the
 # security baseline); other formats regenerate on every scan.
 .nox/out/
+praxis

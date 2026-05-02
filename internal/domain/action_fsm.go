@@ -101,13 +101,10 @@ func buildActionMachine() (*statekit.MachineConfig[actionCtx], error) {
 		}
 	}
 
-	for i, fs := range actionFinalStates {
-		sb := b.State(statekit.StateID(fs)).Final()
-		if i == len(actionFinalStates)-1 {
-			b = sb.Done()
-		} else {
-			b = sb.Done()
-		}
+	// Both branches of the original if/else called sb.Done(); the
+	// statekit Final-state pattern is the same regardless of position.
+	for _, fs := range actionFinalStates {
+		b = b.State(statekit.StateID(fs)).Final().Done()
 	}
 
 	cfg, err := b.Build()

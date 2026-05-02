@@ -187,7 +187,7 @@ func (e *Emitter) post(ctx context.Context, ev domain.MnemosEvent) error {
 	if err != nil {
 		return fmt.Errorf("mnemos: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 		return nil
 	}
@@ -214,12 +214,12 @@ func isRetryable(err error) bool {
 	return true
 }
 
-func backoff(attempt int, initial, max time.Duration) time.Duration {
+func backoff(attempt int, initial, maxDelay time.Duration) time.Duration {
 	d := initial
 	for i := 1; i < attempt; i++ {
 		d *= 2
-		if d > max {
-			d = max
+		if d > maxDelay {
+			d = maxDelay
 			break
 		}
 	}

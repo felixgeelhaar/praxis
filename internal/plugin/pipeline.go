@@ -141,7 +141,7 @@ func RunPipeline(ctx context.Context, cfg PipelineConfig) (PipelineResult, error
 		Errors: make([]PipelineError, 0, len(disc.Errors)),
 	}
 	for _, de := range disc.Errors {
-		res.Errors = append(res.Errors, PipelineError{Dir: de.Dir, Err: de.Err})
+		res.Errors = append(res.Errors, PipelineError(de))
 	}
 
 	for _, d := range disc.Plugins {

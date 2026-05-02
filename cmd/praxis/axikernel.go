@@ -108,57 +108,62 @@ func newMux(deps kernelDeps, m *metrics) *http.ServeMux {
 		writeJSON(w, http.StatusOK, map[string]any{"status": "ok"})
 	})
 
-	mux.HandleFunc("GET /metrics", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /metrics", func(w http.ResponseWriter, _ *http.Request) {
+		// wf is a write-and-swallow-error wrapper. /metrics responses
+		// only fail when the scraper's connection drops mid-flush; the
+		// rest of the body is moot in that case. Wrapping
+		// once keeps every metric line readable.
+		wf := func(format string, args ...any) { _, _ = fmt.Fprintf(w, format, args...) }
 		w.Header().Set("Content-Type", "text/plain; version=0.0.4")
 		delivered, failures := deps.emitter.Stats()
-		fmt.Fprintf(w, "# HELP praxis_actions_total Number of actions processed by status.\n")
-		fmt.Fprintf(w, "# TYPE praxis_actions_total counter\n")
-		fmt.Fprintf(w, "praxis_actions_total{status=\"succeeded\"} %d\n", m.actionsTotal.Load()-m.actionsFailed.Load()-m.actionsRejected.Load()-m.actionsSimulated.Load())
-		fmt.Fprintf(w, "praxis_actions_total{status=\"failed\"} %d\n", m.actionsFailed.Load())
-		fmt.Fprintf(w, "praxis_actions_total{status=\"rejected\"} %d\n", m.actionsRejected.Load())
-		fmt.Fprintf(w, "praxis_actions_total{status=\"simulated\"} %d\n", m.actionsSimulated.Load())
-		fmt.Fprintf(w, "# HELP praxis_outcome_emit_total Mnemos delivery counters.\n")
-		fmt.Fprintf(w, "# TYPE praxis_outcome_emit_total counter\n")
-		fmt.Fprintf(w, "praxis_outcome_emit_total{result=\"delivered\"} %d\n", delivered)
-		fmt.Fprintf(w, "praxis_outcome_emit_total{result=\"failed\"} %d\n", failures)
-		fmt.Fprintf(w, "# HELP praxis_plugin_load_total Plugin load attempts by outcome.\n")
-		fmt.Fprintf(w, "# TYPE praxis_plugin_load_total counter\n")
+		wf("# HELP praxis_actions_total Number of actions processed by status.\n")
+		wf("# TYPE praxis_actions_total counter\n")
+		wf("praxis_actions_total{status=\"succeeded\"} %d\n", m.actionsTotal.Load()-m.actionsFailed.Load()-m.actionsRejected.Load()-m.actionsSimulated.Load())
+		wf("praxis_actions_total{status=\"failed\"} %d\n", m.actionsFailed.Load())
+		wf("praxis_actions_total{status=\"rejected\"} %d\n", m.actionsRejected.Load())
+		wf("praxis_actions_total{status=\"simulated\"} %d\n", m.actionsSimulated.Load())
+		wf("# HELP praxis_outcome_emit_total Mnemos delivery counters.\n")
+		wf("# TYPE praxis_outcome_emit_total counter\n")
+		wf("praxis_outcome_emit_total{result=\"delivered\"} %d\n", delivered)
+		wf("praxis_outcome_emit_total{result=\"failed\"} %d\n", failures)
+		wf("# HELP praxis_plugin_load_total Plugin load attempts by outcome.\n")
+		wf("# TYPE praxis_plugin_load_total counter\n")
 		m.pluginLoad.Range(func(k, v any) bool {
-			fmt.Fprintf(w, "praxis_plugin_load_total{result=%q} %d\n", k.(string), v.(*atomic.Uint64).Load())
+			wf("praxis_plugin_load_total{result=%q} %d\n", k.(string), v.(*atomic.Uint64).Load())
 			return true
 		})
-		fmt.Fprintf(w, "# HELP praxis_plugin_memory_peak_bytes Last reload's cgroup-recorded peak memory per plugin.\n")
-		fmt.Fprintf(w, "# TYPE praxis_plugin_memory_peak_bytes gauge\n")
+		wf("# HELP praxis_plugin_memory_peak_bytes Last reload's cgroup-recorded peak memory per plugin.\n")
+		wf("# TYPE praxis_plugin_memory_peak_bytes gauge\n")
 		m.pluginMemPeak.Range(func(k, v any) bool {
-			fmt.Fprintf(w, "praxis_plugin_memory_peak_bytes{name=%q} %d\n", k.(string), v.(*atomic.Uint64).Load())
+			wf("praxis_plugin_memory_peak_bytes{name=%q} %d\n", k.(string), v.(*atomic.Uint64).Load())
 			return true
 		})
-		fmt.Fprintf(w, "# HELP praxis_plugin_cpu_seconds_total Cumulative CPU seconds consumed since last reload, per plugin.\n")
-		fmt.Fprintf(w, "# TYPE praxis_plugin_cpu_seconds_total counter\n")
+		wf("# HELP praxis_plugin_cpu_seconds_total Cumulative CPU seconds consumed since last reload, per plugin.\n")
+		wf("# TYPE praxis_plugin_cpu_seconds_total counter\n")
 		m.pluginCPUNs.Range(func(k, v any) bool {
 			ns := v.(*atomic.Uint64).Load()
-			fmt.Fprintf(w, "praxis_plugin_cpu_seconds_total{name=%q} %.6f\n", k.(string), float64(ns)/1e9)
+			wf("praxis_plugin_cpu_seconds_total{name=%q} %.6f\n", k.(string), float64(ns)/1e9)
 			return true
 		})
-		fmt.Fprintf(w, "# HELP praxis_mcp_federation_status Connection state per federated upstream (up=1, down=0).\n")
-		fmt.Fprintf(w, "# TYPE praxis_mcp_federation_status gauge\n")
+		wf("# HELP praxis_mcp_federation_status Connection state per federated upstream (up=1, down=0).\n")
+		wf("# TYPE praxis_mcp_federation_status gauge\n")
 		m.mcpFedStatus.Range(func(k, v any) bool {
 			s, _ := v.(*atomic.Value).Load().(string)
 			val := 0
 			if s == "up" {
 				val = 1
 			}
-			fmt.Fprintf(w, "praxis_mcp_federation_status{upstream=%q,status=%q} %d\n", k.(string), s, val)
+			wf("praxis_mcp_federation_status{upstream=%q,status=%q} %d\n", k.(string), s, val)
 			return true
 		})
-		fmt.Fprintf(w, "# HELP praxis_audit_purge_total Audit events purged by retention sweep.\n")
-		fmt.Fprintf(w, "# TYPE praxis_audit_purge_total counter\n")
+		wf("# HELP praxis_audit_purge_total Audit events purged by retention sweep.\n")
+		wf("# TYPE praxis_audit_purge_total counter\n")
 		m.auditPurge.Range(func(k, v any) bool {
 			parts := strings.SplitN(k.(string), "\x00", 2)
 			if len(parts) != 2 {
 				return true
 			}
-			fmt.Fprintf(w, "praxis_audit_purge_total{org_id=%q,result=%q} %d\n",
+			wf("praxis_audit_purge_total{org_id=%q,result=%q} %d\n",
 				parts[0], parts[1], v.(*atomic.Uint64).Load())
 			return true
 		})
@@ -167,8 +172,8 @@ func newMux(deps kernelDeps, m *metrics) *http.ServeMux {
 		if count > 0 {
 			avg = m.requestDurMs.Load() / count
 		}
-		fmt.Fprintf(w, "# HELP praxis_request_duration_ms_avg Average HTTP request duration.\n")
-		fmt.Fprintf(w, "praxis_request_duration_ms_avg %d\n", avg)
+		wf("# HELP praxis_request_duration_ms_avg Average HTTP request duration.\n")
+		wf("praxis_request_duration_ms_avg %d\n", avg)
 	})
 
 	authed := func(h http.HandlerFunc) http.HandlerFunc {
@@ -212,12 +217,12 @@ func newMux(deps kernelDeps, m *metrics) *http.ServeMux {
 	mux.Handle("GET /v1/capabilities/{name}", traced(authed(func(w http.ResponseWriter, r *http.Request) {
 		name := r.PathValue("name")
 		caller := callerFromHeaders(r)
-		cap, err := deps.registry.GetCapabilityForCaller(name, caller)
+		capDesc, err := deps.registry.GetCapabilityForCaller(name, caller)
 		if err != nil {
 			writeJSON(w, http.StatusNotFound, errResponse("capability not found"))
 			return
 		}
-		writeJSON(w, http.StatusOK, cap)
+		writeJSON(w, http.StatusOK, capDesc)
 	})))
 
 	mux.Handle("GET /v1/capabilities/{name}/changelog", traced(authed(func(w http.ResponseWriter, r *http.Request) {

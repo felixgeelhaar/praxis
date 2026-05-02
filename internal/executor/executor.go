@@ -119,12 +119,12 @@ func (e *Executor) Execute(ctx context.Context, action domain.Action) (domain.Re
 	}
 	e.appendAudit(ctx, action, audit.KindReceived, map[string]any{"payload_keys": keys(action.Payload)})
 
-	cap, err := e.registry.GetCapabilityForCaller(action.Capability, action.Caller)
+	capDesc, err := e.registry.GetCapabilityForCaller(action.Capability, action.Caller)
 	if err != nil {
 		return e.reject(ctx, action, "unknown_capability", err.Error())
 	}
 
-	if verr := e.validator.ValidatePayload(action.Payload, cap.InputSchema); verr != nil {
+	if verr := e.validator.ValidatePayload(action.Payload, capDesc.InputSchema); verr != nil {
 		return e.reject(ctx, action, "validation_failed", verr.Error())
 	}
 	if err := e.transition(ctx, &action, domain.EventValidate); err != nil {
@@ -144,7 +144,7 @@ func (e *Executor) Execute(ctx context.Context, action domain.Action) (domain.Re
 		return e.reject(ctx, action, "policy_denied", decision.Reason)
 	}
 
-	if allowed, retryAfter := e.limiter.Allow(ctx, cap, action); !allowed {
+	if allowed, retryAfter := e.limiter.Allow(ctx, capDesc, action); !allowed {
 		e.appendAudit(ctx, action, audit.KindThrottled, map[string]any{
 			"retry_after_ms": retryAfter.Milliseconds(),
 		})
@@ -184,7 +184,7 @@ func (e *Executor) Execute(ctx context.Context, action domain.Action) (domain.Re
 	}
 	hctx, hspan := tracer().Start(ctx, "handler."+action.Capability,
 		trace.WithAttributes(attribute.String("praxis.capability", action.Capability)))
-	output, runErr := e.runner.RunWithCapability(hctx, &cap, handler, action.Payload)
+	output, runErr := e.runner.RunWithCapability(hctx, &capDesc, handler, action.Payload)
 	if runErr != nil {
 		hspan.SetStatus(codes.Error, runErr.Error())
 	}
@@ -198,7 +198,7 @@ func (e *Executor) Execute(ctx context.Context, action domain.Action) (domain.Re
 			Message:   runErr.Error(),
 			Retryable: handlerrunner.IsRetryable(runErr),
 		}
-	} else if oerr := e.validator.ValidateOutput(output, cap.OutputSchema); oerr != nil {
+	} else if oerr := e.validator.ValidateOutput(output, capDesc.OutputSchema); oerr != nil {
 		actionErr = &domain.ActionError{
 			Code:    "output_validation_failed",
 			Message: oerr.Error(),
@@ -226,12 +226,12 @@ func (e *Executor) DryRun(ctx context.Context, action domain.Action) (domain.Sim
 	}
 	e.appendAudit(ctx, action, audit.KindReceived, map[string]any{"dry_run": true})
 
-	cap, err := e.registry.GetCapabilityForCaller(action.Capability, action.Caller)
+	capDesc, err := e.registry.GetCapabilityForCaller(action.Capability, action.Caller)
 	if err != nil {
 		_, _ = e.reject(ctx, action, "unknown_capability", err.Error())
 		return domain.Simulation{}, err
 	}
-	if verr := e.validator.ValidatePayload(action.Payload, cap.InputSchema); verr != nil {
+	if verr := e.validator.ValidatePayload(action.Payload, capDesc.InputSchema); verr != nil {
 		_, _ = e.reject(ctx, action, "validation_failed", verr.Error())
 		return domain.Simulation{}, verr
 	}
@@ -246,7 +246,7 @@ func (e *Executor) DryRun(ctx context.Context, action domain.Action) (domain.Sim
 
 	preview := map[string]any{"note": "capability not simulatable; preview limited to validation + policy"}
 	reversible := false
-	if cap.Simulatable {
+	if capDesc.Simulatable {
 		if handler, herr := e.registry.GetHandlerForCaller(action.Capability, action.Caller); herr == nil {
 			if p, perr := e.runner.Simulate(ctx, handler, action.Payload); perr == nil {
 				preview = p
@@ -368,7 +368,7 @@ func (e *Executor) Resume(ctx context.Context, action domain.Action) (domain.Res
 	ctx, span := tracer().Start(ctx, "executor.Resume",
 		trace.WithAttributes(actionAttrs(action)...))
 	defer span.End()
-	cap, err := e.registry.GetCapabilityForCaller(action.Capability, action.Caller)
+	capDesc, err := e.registry.GetCapabilityForCaller(action.Capability, action.Caller)
 	if err != nil {
 		return e.reject(ctx, action, "unknown_capability", err.Error())
 	}
@@ -391,7 +391,7 @@ func (e *Executor) Resume(ctx context.Context, action domain.Action) (domain.Res
 			Code: "unknown_handler", Message: herr.Error(),
 		})
 	}
-	output, runErr := e.runner.RunWithCapability(ctx, &cap, handler, action.Payload)
+	output, runErr := e.runner.RunWithCapability(ctx, &capDesc, handler, action.Payload)
 	completedAt := e.now()
 
 	var actionErr *domain.ActionError
@@ -401,7 +401,7 @@ func (e *Executor) Resume(ctx context.Context, action domain.Action) (domain.Res
 			Message:   runErr.Error(),
 			Retryable: handlerrunner.IsRetryable(runErr),
 		}
-	} else if oerr := e.validator.ValidateOutput(output, cap.OutputSchema); oerr != nil {
+	} else if oerr := e.validator.ValidateOutput(output, capDesc.OutputSchema); oerr != nil {
 		actionErr = &domain.ActionError{
 			Code:    "output_validation_failed",
 			Message: oerr.Error(),

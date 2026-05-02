@@ -20,6 +20,19 @@ linters:
     - nakedret
     - bodyclose
 
+  settings:
+    revive:
+      rules:
+        # The "exported" rule demands a Godoc comment on every exported
+        # type / function / method / const / var. Praxis ships docstrings
+        # on the load-bearing surface (executor / capability registry /
+        # plugin pipeline / audit service); the long tail of trivial
+        # accessors and value-types is documented at the file level.
+        # Disable the rule project-wide rather than auto-generating
+        # boilerplate comments that would dilute existing ones.
+        - name: exported
+          disabled: true
+
   exclusions:
     rules:
       - path: _test\.go

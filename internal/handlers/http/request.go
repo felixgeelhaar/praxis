@@ -104,7 +104,7 @@ func (h *Request) Execute(ctx context.Context, payload map[string]any) (map[stri
 	if err != nil {
 		return nil, fmt.Errorf("http: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	limited := io.LimitReader(resp.Body, h.maxBody+1)
 	body, err := io.ReadAll(limited)

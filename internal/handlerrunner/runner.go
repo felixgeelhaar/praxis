@@ -121,14 +121,14 @@ func (r *Runner) Run(ctx context.Context, h capability.Handler, payload map[stri
 }
 
 // RunWithCapability invokes a handler using a per-capability retry config
-// derived from cap.Retry. Falls back to the global strategy when the
+// derived from capDesc.Retry. Falls back to the global strategy when the
 // capability does not declare one. Phase-2 M2.3.
-func (r *Runner) RunWithCapability(ctx context.Context, cap *domain.Capability, h capability.Handler, payload map[string]any) (map[string]any, error) {
-	strat := r.retryStrat
-	if cap != nil && cap.Retry != nil {
-		strat = retry.New[map[string]any](buildRetryConfig(*cap.Retry))
+func (r *Runner) RunWithCapability(ctx context.Context, capDesc *domain.Capability, h capability.Handler, payload map[string]any) (map[string]any, error) {
+	strategy := r.retryStrat
+	if capDesc != nil && capDesc.Retry != nil {
+		strategy = retry.New[map[string]any](buildRetryConfig(*capDesc.Retry))
 	}
-	return r.run(ctx, h, payload, strat)
+	return r.run(ctx, h, payload, strategy)
 }
 
 // buildRetryConfig translates a domain.RetryConfig into a fortify retry.Config
@@ -160,7 +160,7 @@ func buildRetryConfig(rc domain.RetryConfig) retry.Config {
 	return cfg
 }
 
-func (r *Runner) run(ctx context.Context, h capability.Handler, payload map[string]any, strat retry.Retry[map[string]any]) (map[string]any, error) {
+func (r *Runner) run(ctx context.Context, h capability.Handler, payload map[string]any, strategy retry.Retry[map[string]any]) (map[string]any, error) {
 	execute := func(ctx context.Context) (map[string]any, error) {
 		resultCh := make(chan struct {
 			output map[string]any
@@ -193,7 +193,7 @@ func (r *Runner) run(ctx context.Context, h capability.Handler, payload map[stri
 	}
 
 	output, err := r.circuitBreaker.Execute(ctx, func(ctx context.Context) (map[string]any, error) {
-		return strat.Do(ctx, execute)
+		return strategy.Do(ctx, execute)
 	})
 
 	if err != nil {

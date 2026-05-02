@@ -98,6 +98,7 @@ func (h *CreateIssue) Execute(ctx context.Context, payload map[string]any) (map[
 		return simulatedIssue(payload), nil
 	}
 	url := fmt.Sprintf("%s/repos/%s/%s/issues", h.cfg.BaseURL, owner, repo)
+	//nolint:bodyclose // postJSON closes the body before returning; resp is metadata-only.
 	resp, raw, err := postJSON(ctx, h.cfg.Client, url, h.cfg.Token, body)
 	if err != nil {
 		return nil, err
@@ -204,6 +205,7 @@ func (h *AddComment) Execute(ctx context.Context, payload map[string]any) (map[s
 		}, nil
 	}
 	url := fmt.Sprintf("%s/repos/%s/%s/issues/%d/comments", h.cfg.BaseURL, owner, repo, issueNum)
+	//nolint:bodyclose // postJSON closes the body before returning; resp is metadata-only.
 	resp, raw, err := postJSON(ctx, h.cfg.Client, url, h.cfg.Token, map[string]any{"body": body})
 	if err != nil {
 		return nil, err
@@ -275,7 +277,7 @@ func postJSON(ctx context.Context, client *http.Client, url, token string, body 
 	if err != nil {
 		return nil, nil, fmt.Errorf("github: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	raw, _ := io.ReadAll(resp.Body)
 	return resp, raw, nil
 }

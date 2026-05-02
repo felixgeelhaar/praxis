@@ -105,7 +105,7 @@ func (n *Notifier) Notify(ctx context.Context, action domain.Action, result doma
 	if err != nil {
 		return fmt.Errorf("webhook: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return fmt.Errorf("webhook: HTTP %d", resp.StatusCode)
 	}
