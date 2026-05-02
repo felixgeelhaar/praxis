@@ -399,7 +399,7 @@ func (r *fakeHistoryRepo) count(name string) int {
 }
 
 type fakeCapRepo struct {
-	mu sync.Mutex
+	mu       sync.Mutex
 	upserted []domain.Capability
 }
 
@@ -457,4 +457,3 @@ func (erroringCapRepo) Get(context.Context, string) (domain.Capability, error) {
 func (erroringCapRepo) List(context.Context) ([]domain.Capability, error) {
 	return nil, nil
 }
-
