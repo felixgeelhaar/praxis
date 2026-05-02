@@ -78,3 +78,28 @@ jobs:
           name: nox-${{ github.sha }}
           path: ./.nox/out/
           retention-days: 30
+
+      # Hard gate: every firing rule category must have a VEX statement
+      # justifying it. A new rule that fires without a baseline entry
+      # fails the build so accepting a finding is always a deliberate
+      # commit to .nox/vex.json — never silent drift. Phase 6 t-security-workflow.
+      - name: Fail on unbaselined finding categories
+        if: always()
+        run: |
+          set -euo pipefail
+          if [ ! -f ./.nox/out/findings.json ]; then
+            echo "findings.json missing; nox scan did not run"
+            exit 1
+          fi
+          covered=$(jq -r '.statements[].vulnerability."@id"' ./.nox/vex.json | sort -u)
+          found=$(jq -r '.[].RuleID // empty' ./.nox/out/findings.json | sort -u)
+          new=$(comm -23 <(echo "$found") <(echo "$covered") || true)
+          if [ -n "$new" ]; then
+            echo "::error::New finding categories without a VEX statement:"
+            echo "$new" | sed 's/^/  - /'
+            echo
+            echo "Add a statement to .nox/vex.json with status + justification + impact_statement,"
+            echo "or fix the underlying issue. Refer to SECURITY.md for the waiver process."
+            exit 1
+          fi
+          echo "All finding categories are covered by .nox/vex.json"

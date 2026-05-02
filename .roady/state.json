@@ -1,6 +1,6 @@
 {
   "project_id": "Praxis",
-  "version": 97,
+  "version": 99,
   "task_states": {
     "t-action-fsm": {
       "status": "done",
@@ -851,8 +851,10 @@
       "elapsed_minutes": 4
     },
     "t-security-workflow": {
-      "status": "pending",
+      "status": "in_progress",
       "path": "",
+      "owner": "ai-agent",
+      "started_at": "2026-05-02T13:02:50.145497+02:00",
       "elapsed_minutes": 0
     },
     "t-sqlc-config": {
@@ -934,12 +936,16 @@
       "elapsed_minutes": 90
     },
     "t-vex-bootstrap": {
-      "status": "in_progress",
+      "status": "done",
       "path": "",
       "owner": "ai-agent",
+      "evidence": [
+        "63b3ad5"
+      ],
       "started_at": "2026-05-02T12:17:39.462095+02:00",
-      "elapsed_minutes": 0
+      "completed_at": "2026-05-02T13:02:45.066712+02:00",
+      "elapsed_minutes": 45
     }
   },
-  "updated_at": "2026-05-02T12:17:39.462095+02:00"
+  "updated_at": "2026-05-02T13:02:50.145497+02:00"
 }
