@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Praxis — the syscall layer for agents</title>
+  <meta name="description" content="Three verbs, one capability registry, replay-from-audit. The small, audited surface through which an agent reaches the world. MIT, single Go binary.">
+  <meta property="og:title" content="Praxis — the syscall layer for agents">
+  <meta property="og:description" content="Audited tool calls, by default. The model decides; Praxis commits.">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<a class="skip-link" href="#main">Skip to content</a>
+
+<header>
+  <div class="wrap">
+    <div class="logo" aria-label="Praxis">praxis<span aria-hidden="true">.</span></div>
+    <nav aria-label="Primary">
+      <a href="#scenario">Scenario</a>
+      <a href="#vs">Vs. alternatives</a>
+      <a href="#architecture">Architecture</a>
+      <a href="#run">Run it</a>
+      <a href="https://github.com/felixgeelhaar/praxis">GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main" class="wrap">
+
+<section class="hero">
+  <p class="kicker">For platform engineers running AI agents in production paths.</p>
+  <h1>The model decides. <span class="accent">Praxis commits.</span></h1>
+  <p class="lede">
+    Praxis is the small, audited surface through which an agent or
+    automation reaches the world. Three verbs:
+    <em>ListCapabilities · Execute · DryRun</em>. Every action named,
+    schema-validated, policy-checked, idempotent, and reconstructible
+    from the audit log. MIT-licensed, single Go binary.
+  </p>
+  <div class="cta-row">
+    <a class="cta primary" href="#run">Run the demo</a>
+    <a class="cta" href="https://github.com/felixgeelhaar/praxis" aria-label="View Praxis on GitHub">★ on GitHub</a>
+    <a class="cta ghost" href="#scenario">See the scenario ↓</a>
+  </div>
+  <ul class="badges" aria-label="At a glance">
+    <li>MIT licensed</li>
+    <li>Go · single binary</li>
+    <li>CLI · HTTP · MCP</li>
+    <li>SQLite · Postgres · in-memory</li>
+    <li>sigstore-verified plugins</li>
+  </ul>
+</section>
+
+<section id="scenario" aria-labelledby="scenario-heading">
+  <p class="kicker">Scenario</p>
+  <h2 id="scenario-heading">Discover, dry-run, execute, replay, idempotent retry.</h2>
+  <p>
+    No SMTP/Slack credentials required — degraded handlers return a
+    simulated success so the loop completes on a laptop. The
+    load-bearing demo: every step persists to the audit log, and
+    <code>praxis log show</code> reconstructs the entire lifecycle
+    from those rows alone.
+  </p>
+
+  <div class="terminal" role="figure" aria-label="Praxis demo walkthrough">
+    <div class="bar" aria-hidden="true">
+      <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+      <span class="label">$ praxis · five-stage demo</span>
+    </div>
+<pre><code>$ make build
+$ ./bin/praxis caps list
+NAME              IDEMPOTENT  SIMULATABLE
+send_email        true        true
+send_message      true        true
+http_request      true        true
+github_create_issue ...
+
+$ ./bin/praxis run send_email \
+    '{"to":"alex@example.com","subject":"hi","body":"hello"}' --dry-run
+{ "action_id": "act_7a1", "status": "simulated",
+  "preview": { "to": "alex@…", "subject": "hi", "body_chars": 5 } }
+
+$ ./bin/praxis run send_email \
+    '{"to":"alex@example.com","subject":"hi","body":"hello"}'
+{ "action_id": "act_7b2", "status": "succeeded", "external_id": "<no SMTP — simulated>" }
+
+$ ./bin/praxis log show act_7b2
+received    -&gt; validated -&gt; policy.allow -&gt; executed -&gt; succeeded
+inputs:     to=alex@example.com subject=hi
+policy:     rule=default decision=allow
+duration:   12ms
+
+$ ./bin/praxis run send_email \
+    '{"to":"alex@example.com","subject":"hi","body":"hello"}' \
+    --idempotency-key act_7b2
+{ "action_id": "act_7b2", "status": "succeeded", "from_cache": true }
+# second call short-circuits — no double effects, recorded in audit</code></pre>
+  </div>
+
+  <div class="callout">
+    <strong>Replay-from-audit is the feature that pays for the runtime.</strong>
+    The same executor serves CLI, HTTP, and MCP. The audit log is
+    structurally complete — given only the rows, you reconstruct the
+    full lifecycle. Idempotency is enforced at the destination via
+    keys forwarded from the caller; retries collapse, side effects
+    don't.
+  </div>
+</section>
+
+<section id="vs" aria-labelledby="vs-heading">
+  <p class="kicker">How it differs</p>
+  <h2 id="vs-heading">Where Praxis fits.</h2>
+  <p>
+    Praxis is not a workflow engine, not an agent framework, not a
+    tool router. It's the layer where the act of <em>doing one
+    thing</em> is governed, simulated, and reconstructible.
+  </p>
+  <div class="vs-table" role="table" aria-label="Comparison with related tools">
+    <div class="vs-row vs-head" role="row">
+      <span role="columnheader">Tool</span>
+      <span role="columnheader">Solves</span>
+      <span role="columnheader">Praxis's seam</span>
+    </div>
+    <div class="vs-row" role="row">
+      <span role="cell"><strong>Anthropic Computer Use · OpenAI tool-calling</strong></span>
+      <span role="cell">How a model emits an action.</span>
+      <span role="cell">Praxis is where the action is <em>named, validated, gated, and recorded</em>. The model decides; Praxis commits.</span>
+    </div>
+    <div class="vs-row" role="row">
+      <span role="cell"><strong>n8n · Zapier</strong></span>
+      <span role="cell">Workflow DAG glue, UI cron.</span>
+      <span role="cell">Praxis is one well-shaped <code>Execute</code> per call with replay-from-audit, idempotency, and policy as first-class verbs — no DAG, no UI.</span>
+    </div>
+    <div class="vs-row" role="row">
+      <span role="cell"><strong>Temporal Activities</strong></span>
+      <span role="cell">Durable workflows.</span>
+      <span role="cell">Temporal makes workflows durable; Praxis makes <em>the act of doing one thing</em> governed and reconstructible. Use Praxis from a Temporal activity, not instead.</span>
+    </div>
+    <div class="vs-row" role="row">
+      <span role="cell"><strong>Raw webhooks · MCP tool servers</strong></span>
+      <span role="cell">Expose endpoints.</span>
+      <span role="cell">Praxis exposes a capability <em>registry</em> with schema, policy, dry-run parity, sigstore-verified plugins, and a permanent audit chain.</span>
+    </div>
+  </div>
+
+  <h3 class="subhead">Capability registry, by design</h3>
+  <p>
+    Every capability ships with a JSON Schema for inputs, an output
+    schema, an idempotent flag, a simulatable flag, and a policy
+    profile. <code>DryRun</code> validates against the same schema
+    <code>Execute</code> uses; the two paths can never diverge in
+    practice.
+  </p>
+</section>
+
+<section id="architecture" aria-labelledby="arch-heading">
+  <p class="kicker">Architecture</p>
+  <h2 id="arch-heading">Caller → Executor → vendor + audit + outbox.</h2>
+  <p>
+    One executor. One audit chain. One outbox to Mnemos. CLI / HTTP /
+    MCP all run the same path; the audit can't diverge because
+    there's only one path to diverge from.
+  </p>
+
+  <div class="diagram">
+<svg viewBox="0 0 920 400" xmlns="http://www.w3.org/2000/svg" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="13" role="img" aria-labelledby="praxis-arch-title praxis-arch-desc">
+  <title id="praxis-arch-title">Praxis execution flow</title>
+  <desc id="praxis-arch-desc">Callers (Nous, agent, CLI, MCP) hit the executor; the executor runs validate, policy, idempotency, then dispatches to the registered handler; results flow to the caller while audit + Mnemos outbox capture the lifecycle.</desc>
+  <style>
+    .box { fill: #14181d; stroke: #2a323d; stroke-width: 1; }
+    .box-accent { stroke: #7ad1ff; }
+    .box-warm { stroke: #ffb86b; }
+    .label { fill: #e6e8eb; }
+    .label-dim { fill: #8a93a0; font-size: 11px; }
+    .label-accent { fill: #7ad1ff; }
+    .label-warm { fill: #ffb86b; }
+    .arrow { stroke: #4a5562; stroke-width: 1.5; fill: none; }
+    .arrow-accent { stroke: #7ad1ff; stroke-width: 1.5; fill: none; }
+    @media (prefers-color-scheme: light) {
+      .box { fill: #ffffff; stroke: #d1d5db; }
+      .box-accent { stroke: #0066b3; }
+      .box-warm { stroke: #b04400; }
+      .label { fill: #131720; }
+      .label-dim { fill: #5a6272; }
+      .label-accent { fill: #0066b3; }
+      .label-warm { fill: #b04400; }
+      .arrow { stroke: #9aa3af; }
+      .arrow-accent { stroke: #0066b3; }
+    }
+  </style>
+  <defs>
+    <marker id="ah4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#4a5562"/>
+    </marker>
+    <marker id="aha4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#7ad1ff"/>
+    </marker>
+  </defs>
+
+  <text class="label-dim" x="100" y="40" text-anchor="middle">callers</text>
+  <rect class="box" x="20" y="60" width="160" height="50" rx="6"/>
+  <text class="label" x="100" y="82" text-anchor="middle">Nous · agent</text>
+  <text class="label-dim" x="100" y="98" text-anchor="middle">/v1/actions</text>
+  <rect class="box" x="20" y="130" width="160" height="50" rx="6"/>
+  <text class="label" x="100" y="152" text-anchor="middle">CLI · ./bin/praxis</text>
+  <text class="label-dim" x="100" y="168" text-anchor="middle">caps · run · log</text>
+  <rect class="box" x="20" y="200" width="160" height="50" rx="6"/>
+  <text class="label" x="100" y="222" text-anchor="middle">MCP federation</text>
+  <text class="label-dim" x="100" y="238" text-anchor="middle">tool calls</text>
+
+  <text class="label-accent" x="430" y="40" text-anchor="middle">executor (one path)</text>
+  <rect class="box box-accent" x="270" y="60" width="320" height="190" rx="10"/>
+  <text class="label-accent" x="430" y="90" text-anchor="middle" font-size="15" font-weight="bold">validate · policy · idempotency · run</text>
+  <text class="label-dim" x="430" y="115" text-anchor="middle">capability registry · JSON Schema</text>
+  <text class="label-dim" x="430" y="135" text-anchor="middle">policy modes: enforce · log · off</text>
+  <text class="label-dim" x="430" y="155" text-anchor="middle">idempotency keeper · vendor key forward</text>
+  <text class="label-dim" x="430" y="180" text-anchor="middle">handlers: slack · email · github · linear</text>
+  <text class="label-dim" x="430" y="200" text-anchor="middle">  http_request · calendar · sigstore plugins</text>
+  <text class="label-dim" x="430" y="225" text-anchor="middle">replay-from-audit canary on every commit</text>
+
+  <text class="label-warm" x="780" y="40" text-anchor="middle">side effects + audit</text>
+  <rect class="box box-warm" x="700" y="60" width="180" height="50" rx="6"/>
+  <text class="label-warm" x="790" y="82" text-anchor="middle">vendor</text>
+  <text class="label-dim" x="790" y="98" text-anchor="middle">slack · smtp · github api</text>
+  <rect class="box box-warm" x="700" y="130" width="180" height="50" rx="6"/>
+  <text class="label-warm" x="790" y="152" text-anchor="middle">audit log</text>
+  <text class="label-dim" x="790" y="168" text-anchor="middle">received → … → terminal</text>
+  <rect class="box box-warm" x="700" y="200" width="180" height="50" rx="6"/>
+  <text class="label-warm" x="790" y="222" text-anchor="middle">Mnemos outbox</text>
+  <text class="label-dim" x="790" y="238" text-anchor="middle">outcome events</text>
+
+  <path class="arrow" d="M 180 85 L 270 90" marker-end="url(#ah4)"/>
+  <path class="arrow" d="M 180 155 L 270 155" marker-end="url(#ah4)"/>
+  <path class="arrow" d="M 180 225 L 270 220" marker-end="url(#ah4)"/>
+
+  <path class="arrow-accent" d="M 590 85 L 700 85" marker-end="url(#aha4)"/>
+  <path class="arrow-accent" d="M 590 155 L 700 155" marker-end="url(#aha4)"/>
+  <path class="arrow-accent" d="M 590 225 L 700 225" marker-end="url(#aha4)"/>
+
+  <rect class="box" x="20" y="290" width="880" height="80" rx="8"/>
+  <text class="label-dim" x="60" y="316">Three verbs only: <tspan font-family="ui-monospace,Menlo">ListCapabilities</tspan> · <tspan font-family="ui-monospace,Menlo">Execute</tspan> · <tspan font-family="ui-monospace,Menlo">DryRun</tspan>.</text>
+  <text class="label-dim" x="60" y="338">Storage: SQLite (default) · Postgres · in-memory. Auth: bearer · JWT · OIDC. Tracing: OpenTelemetry.</text>
+  <text class="label-dim" x="60" y="358">Plugins: Go-plugin host with sigstore verification — out-of-tree handlers without rebuilding the binary.</text>
+</svg>
+  </div>
+</section>
+
+<section id="run" aria-labelledby="run-heading">
+  <p class="kicker">Run it</p>
+  <h2 id="run-heading">Build. Discover. Dry-run. Execute. Replay.</h2>
+  <pre><code>git clone https://github.com/felixgeelhaar/praxis.git
+cd praxis &amp;&amp; make build
+
+./bin/praxis caps list
+./bin/praxis run send_email '{"to":"a@example.com","subject":"hi","body":"hello"}' --dry-run
+./bin/praxis run send_email '{"to":"a@example.com","subject":"hi","body":"hello"}'
+./bin/praxis log show &lt;action-id&gt;</code></pre>
+
+  <p>HTTP surface (same executor):</p>
+  <pre><code>./bin/praxis serve --port 8080 &amp;
+curl -H 'Authorization: Bearer …' \
+     -d @action.json \
+     localhost:8080/v1/actions</code></pre>
+
+  <div class="callout callout-honest">
+    <strong>What's shipped today.</strong>
+    Capability registry + JSON Schema validation, policy modes,
+    idempotency keeper, audit log + replay-from-audit canary on every
+    commit. Slack, SMTP, GitHub, Linear, Calendar, http_request
+    handlers — credentialed when env vars are set, degraded-mode
+    simulated otherwise. Sigstore-verified Go-plugin loader. OTel
+    traces. MCP federation that aggregates upstream MCP servers as
+    Praxis capabilities. No one-shot <code>./demo.sh</code> — the CLI
+    flow above is the demo. <code>DryRun</code> parity isn't 100%
+    across every handler; multi-tenant policy + reversibility are
+    scaffolded, not the headline.
+  </div>
+</section>
+
+<section id="stack" aria-labelledby="stack-heading">
+  <p class="kicker">Cognitive stack context</p>
+  <h2 id="stack-heading">Praxis works alone. Plugs into a four-system stack.</h2>
+  <p>
+    Mnemos remembers, Chronos watches time, Nous decides, Praxis
+    executes. Olymp drives the loop. Each is independently usable.
+  </p>
+  <div class="cols">
+    <div class="card"><h3><a href="https://felixgeelhaar.github.io/mnemos/">Mnemos · memory</a></h3><p>Evidence-linked claims with point-in-time replay and contradiction detection.</p></div>
+    <div class="card"><h3><a href="https://felixgeelhaar.github.io/chronos/">Chronos · time</a></h3><p>Pattern detection over time-series data. Typed signals, not threshold alerts.</p></div>
+    <div class="card"><h3><a href="https://felixgeelhaar.github.io/nous/">Nous · decisions</a></h3><p>Commitment extraction, risk evaluation, intervention generation.</p></div>
+    <div class="card"><h3><a href="https://felixgeelhaar.github.io/olymp/">Olymp · runtime</a></h3><p>Drives observe → understand → decide → act → learn end-to-end.</p></div>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap footer-grid">
+    <div>
+      <div class="logo">praxis<span aria-hidden="true">.</span></div>
+      <p class="dim">MIT licensed · single Go binary · CLI + HTTP + MCP · sigstore-verified plugins.</p>
+    </div>
+    <div>
+      <h4>Project</h4>
+      <ul>
+        <li><a href="https://github.com/felixgeelhaar/praxis">GitHub repo</a></li>
+        <li><a href="https://github.com/felixgeelhaar/praxis/blob/main/Roadmap.md">Roadmap</a></li>
+        <li><a href="https://github.com/felixgeelhaar/praxis/blob/main/SECURITY.md">Security</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Stack</h4>
+      <ul>
+        <li><a href="https://felixgeelhaar.github.io/mnemos/">Mnemos</a></li>
+        <li><a href="https://felixgeelhaar.github.io/chronos/">Chronos</a></li>
+        <li><a href="https://felixgeelhaar.github.io/nous/">Nous</a></li>
+        <li><a href="https://felixgeelhaar.github.io/olymp/">Olymp</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Contact</h4>
+      <ul>
+        <li><a href="https://github.com/felixgeelhaar/praxis/discussions">Discussions</a></li>
+        <li><a href="https://github.com/felixgeelhaar/praxis/issues">Issues</a></li>
+        <li><a href="mailto:felix.geelhaar@gmail.com">Design partners →</a></li>
+      </ul>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>
