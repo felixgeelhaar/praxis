@@ -3,257 +3,111 @@
   "spec_id": "Praxis",
   "tasks": [
     {
-      "id": "t-otel-tracer-bootstrap",
-      "title": "OTel tracer provider bootstrap + config",
-      "description": "Wire go.opentelemetry.io/otel + otlp gRPC exporter; PRAXIS_OTLP_ENDPOINT/PROTOCOL/SAMPLE config; tracer.Shutdown on SIGTERM; default off when endpoint empty",
+      "id": "t-fed-http-transport",
+      "title": "Wire MCP federation HTTP transport once mcp-go ships it",
+      "description": "Replace ErrURLTransportUnsupported with mcp-go HTTP/SSE client; Bearer token forwarding; HTTPS verification against the operator's CA bundle; reconnect via existing Supervisor",
       "priority": "high",
       "estimate": "3h",
       "depends_on": [],
-      "feature_id": "f-otel-tracing"
+      "feature_id": "f-fed-http"
     },
     {
-      "id": "t-otel-executor-spans",
-      "title": "Executor opens spans for Execute/DryRun/Resume/Revert",
-      "description": "internal/executor: per-action span with attrs capability, action_id, status, policy_decision, org_id, team_id; lifecycle events as span events; child span around handler runner.RunWithCapability",
-      "priority": "high",
-      "estimate": "3h",
-      "depends_on": [
-        "t-otel-tracer-bootstrap"
-      ],
-      "feature_id": "f-otel-tracing"
-    },
-    {
-      "id": "t-otel-handler-propagation",
-      "title": "Plugin HTTP client injects W3C traceparent on outbound requests",
-      "description": "internal/plugin sandbox HTTP client uses otelhttp.NewTransport so vendor latency joins the same trace; plugin authors call plugin.HTTPClient(ctx) unchanged",
-      "priority": "high",
-      "estimate": "2h",
-      "depends_on": [
-        "t-otel-tracer-bootstrap"
-      ],
-      "feature_id": "f-otel-tracing"
-    },
-    {
-      "id": "t-otel-mcp-spans",
-      "title": "MCP server inherits span from incoming session",
-      "description": "internal/mcp: extract context from session metadata if upstream sent one, else open root span; tool calls become child spans",
-      "priority": "medium",
-      "estimate": "1h",
-      "depends_on": [
-        "t-otel-tracer-bootstrap"
-      ],
-      "feature_id": "f-otel-tracing"
-    },
-    {
-      "id": "t-cgroup-v2-detect",
-      "title": "Detect cgroup v2 mount and delegated subtree at startup",
-      "description": "internal/plugin/cgroup: probe /sys/fs/cgroup/cgroup.controllers, /sys/fs/cgroup/praxis writability; fall back to setrlimit + log when unavailable",
-      "priority": "high",
-      "estimate": "2h",
-      "depends_on": [],
-      "feature_id": "f-cgroup-v2"
-    },
-    {
-      "id": "t-cgroup-v2-spawn",
-      "title": "Spawn pluginhost into cgroup via CLONE_INTO_CGROUP",
-      "description": "Use unix.SchedSetattr or syscall raw clone3 with CLONE_INTO_CGROUP so child enters cgroup atomically; write memory.max + cpu.max from ResourceBudget before spawn; remove cgroup on plugin unload",
+      "id": "t-fulcio-verifier",
+      "title": "Sigstore Fulcio + Rekor verifier for plugin signatures",
+      "description": "internal/plugin: alongside PEM-key path, add KeylessVerifier{TrustedIdentities, FulcioRoots, RekorURL}; plugin .sig+.cert pairs; chain validation; transparency-log inclusion proof",
       "priority": "high",
       "estimate": "5h",
-      "depends_on": [
-        "t-cgroup-v2-detect"
-      ],
-      "feature_id": "f-cgroup-v2"
-    },
-    {
-      "id": "t-cgroup-v2-usage-metrics",
-      "title": "Read memory.peak + cpu.stat at reload, surface in /metrics",
-      "description": "praxis_plugin_memory_peak_bytes{name} + praxis_plugin_cpu_seconds_total{name}; capture at watchCrash to attribute resource usage to the dead plugin",
-      "priority": "medium",
-      "estimate": "2h",
-      "depends_on": [
-        "t-cgroup-v2-spawn"
-      ],
-      "feature_id": "f-cgroup-v2"
-    },
-    {
-      "id": "t-schema-version-fields",
-      "title": "Capability gains InputSchemaVersion + OutputSchemaVersion",
-      "description": "domain.Capability fields; SQL migrations for capabilities table on sqlite + postgres; sqlc regen; backfill with v1 default",
-      "priority": "high",
-      "estimate": "2h",
       "depends_on": [],
-      "feature_id": "f-schema-versioning"
+      "feature_id": "f-fulcio-verify"
     },
     {
-      "id": "t-schema-compat-checker",
-      "title": "Schema compatibility checker on Register",
-      "description": "internal/schema/compat.go: detect breaking changes (renamed required field, narrowed enum, tightened type); modes strict|warn|off via PRAXIS_SCHEMA_COMPAT",
+      "id": "t-fulcio-config",
+      "title": "PRAXIS_PLUGIN_TRUSTED_IDENTITIES config + bootstrap",
+      "description": "config.PluginTrustedIdentities (comma-separated identity = OIDC issuer + subject); bootstrap selects KeylessVerifier when set, falls back to PEM keys when not",
       "priority": "high",
-      "estimate": "4h",
-      "depends_on": [
-        "t-schema-version-fields"
-      ],
-      "feature_id": "f-schema-versioning"
-    },
-    {
-      "id": "t-schema-changelog-endpoint",
-      "title": "GET /v1/capabilities/{name} renders changelog",
-      "description": "Capability response includes per-version diff log; endpoint backed by capabilities_history table",
-      "priority": "medium",
-      "estimate": "3h",
-      "depends_on": [
-        "t-schema-compat-checker"
-      ],
-      "feature_id": "f-schema-versioning"
-    },
-    {
-      "id": "t-bench-suite-scaffolding",
-      "title": "bench/ scaffolding with Execute hot-path benchmark",
-      "description": "BenchmarkExecute_Memory/Sqlite/Postgres against synthetic handler; -count=10 -benchmem; benchstat-friendly output",
-      "priority": "high",
-      "estimate": "3h",
-      "depends_on": [],
-      "feature_id": "f-perf-benchmarks"
-    },
-    {
-      "id": "t-bench-ci-regression",
-      "title": "make bench-check + CI regression detection",
-      "description": "Compare current bench against last-tagged baseline; fail CI if p50 regresses \u003e20%; benchstat in github-actions workflow",
-      "priority": "medium",
-      "estimate": "2h",
-      "depends_on": [
-        "t-bench-suite-scaffolding"
-      ],
-      "feature_id": "f-perf-benchmarks"
-    },
-    {
-      "id": "t-bench-out-of-process",
-      "title": "Benchmark out-of-process IPC overhead",
-      "description": "BenchmarkExecute_ProcessOpener with fakeChild over real pipes; measure latency overhead per call vs in-process baseline",
-      "priority": "medium",
-      "estimate": "2h",
-      "depends_on": [
-        "t-bench-suite-scaffolding"
-      ],
-      "feature_id": "f-perf-benchmarks"
-    },
-    {
-      "id": "t-bench-publish-docs",
-      "title": "Auto-publish benchmark results to docs/benchmarks.md on tag",
-      "description": "Tag-triggered CI job runs full bench, formats with benchstat, opens PR updating docs/benchmarks.md",
-      "priority": "low",
       "estimate": "1h",
       "depends_on": [
-        "t-bench-ci-regression"
+        "t-fulcio-verifier"
       ],
-      "feature_id": "f-perf-benchmarks"
+      "feature_id": "f-fulcio-verify"
     },
     {
-      "id": "t-mcp-federation-config",
-      "title": "mcp.federation.yaml config + parser",
-      "description": "internal/mcp/federation: parse config of upstream MCP servers (URL or stdio cmd, token, allowlist); env var PRAXIS_MCP_FEDERATION_CONFIG points at file",
+      "id": "t-mtls-server",
+      "title": "PRAXIS_TLS_CERT_FILE + KEY_FILE for HTTP server",
+      "description": "cmd/praxis serve loads cert/key, http.Server with TLSConfig; reload on SIGHUP without dropping connections",
       "priority": "high",
       "estimate": "2h",
       "depends_on": [],
-      "feature_id": "f-mcp-federation"
+      "feature_id": "f-mtls"
     },
     {
-      "id": "t-mcp-federation-client",
-      "title": "mcp-go client connects upstream + fetches tool catalogue",
-      "description": "Per-upstream goroutine maintains connection; reconnect on failure; surfaces tools via Watchable to the Manager",
-      "priority": "high",
-      "estimate": "4h",
-      "depends_on": [
-        "t-mcp-federation-config"
-      ],
-      "feature_id": "f-mcp-federation"
-    },
-    {
-      "id": "t-mcp-federation-handler",
-      "title": "federatedHandler routes Execute through executor pipeline",
-      "description": "Each upstream tool becomes a Capability; handler forwards Execute/Simulate via mcp-go client; audit detail records upstream identity",
-      "priority": "high",
-      "estimate": "3h",
-      "depends_on": [
-        "t-mcp-federation-client"
-      ],
-      "feature_id": "f-mcp-federation"
-    },
-    {
-      "id": "t-mcp-federation-failure-handling",
-      "title": "Upstream failure deregisters tools via Watchable pattern",
-      "description": "Reuses out-of-process loader's Watch contract; same crash-recovery wiring; metric praxis_mcp_federation_status{upstream,status}",
+      "id": "t-mtls-client-ca",
+      "title": "PRAXIS_MTLS_CLIENT_CA_FILE for client cert verification",
+      "description": "Server's TLSConfig.ClientCAs + ClientAuth=RequireAndVerifyClientCert when env set; integration tests with self-signed CA + client cert",
       "priority": "high",
       "estimate": "2h",
       "depends_on": [
-        "t-mcp-federation-client"
+        "t-mtls-server"
       ],
-      "feature_id": "f-mcp-federation"
+      "feature_id": "f-mtls"
     },
     {
-      "id": "t-pluginhost-resource-limits",
-      "title": "cgroups + setrlimit applied to plugin child process",
-      "description": "On Linux apply cgroup v2 memory.max and cpu.max from ResourceBudget; on darwin/BSD use setrlimit(RLIMIT_AS, RLIMIT_CPU) as best-effort. Network egress filtered at the firewall via supplied http.Client (carried over from in-process sandbox).",
-      "priority": "high",
-      "estimate": "4h",
-      "depends_on": [
-        "t-pluginhost-binary"
-      ],
-      "feature_id": "f-plugin-out-of-process"
-    },
-    {
-      "id": "t-pluginhost-crash-recovery",
-      "title": "Parent removes registration on child crash, increments metric",
-      "description": "Parent watches child process; SIGCHLD or read EOF on the IPC pipe deregisters every capability the plugin contributed and emits praxis_plugin_crash_total. Subsequent ListCapabilities omits the plugin until reload.",
-      "priority": "high",
+      "id": "t-out-of-process-default",
+      "title": "PRAXIS_PLUGIN_OUT_OF_PROCESS bootstrap flag",
+      "description": "When set, bootstrap selects ProcessOpener with Binary from PRAXIS_PLUGINHOST_BINARY; sets CgroupParent when cgroup.Detect available; documented trade-offs in SECURITY.md",
+      "priority": "medium",
       "estimate": "2h",
-      "depends_on": [
-        "t-pluginhost-binary"
-      ],
-      "feature_id": "f-plugin-out-of-process"
+      "depends_on": [],
+      "feature_id": "f-oop-default"
     },
     {
-      "id": "t-tenant-private-capabilities",
-      "title": "Tenant-scoped capability registries so private caps stay isolated",
-      "description": "Tenant-scoped capability registries so private caps stay isolated",
-      "priority": "high",
-      "estimate": "3h",
-      "depends_on": [
-        "t-tenant-scope-hierarchy"
-      ],
-      "feature_id": "f19-multi-tenant-policy"
-    },
-    {
-      "id": "t-handler-github-create-issue",
-      "title": "GitHub create_issue handler via go-github with idempotency at vendor",
-      "description": "GitHub create_issue handler via go-github with idempotency at vendor",
-      "priority": "high",
+      "id": "t-changelog-schema",
+      "title": "capability_history schema + migration 005",
+      "description": "Add capability_history table to sqlite + postgres + memory; sqlc CRUD; RegistryHistoryRepo port",
+      "priority": "medium",
       "estimate": "3h",
       "depends_on": [],
-      "feature_id": "f14-more-handlers"
+      "feature_id": "f-changelog-persistent"
     },
     {
-      "id": "t-outcome-emitter",
-      "title": "Implement OutcomeEmitter (Mnemos writeback)",
-      "description": "internal/outcome/ posting praxis.action_completed events to Mnemos POST /v1/events. fortify/retry with Mnemos-equivalent defaults (5xx + 429 retry, 4xx fail fast, exponential backoff with jitter). Outbox in configured backend; background worker drains. Never blocks Execute. Acceptance: integration test against test Mnemos; metrics expose emit failures.",
-      "priority": "high",
-      "estimate": "3h",
+      "id": "t-changelog-persist",
+      "title": "Wire registry History append + read through repository",
+      "description": "Registry stores HistoryEntry via RegistryHistoryRepo; /v1/capabilities/{name}/changelog reads from repo; tests across all three backends",
+      "priority": "medium",
+      "estimate": "2h",
       "depends_on": [
-        "t-executor-execute",
-        "t-store-memory"
+        "t-changelog-schema"
       ],
-      "feature_id": "f7-outcome-writeback"
+      "feature_id": "f-changelog-persistent"
     },
     {
-      "id": "t-mcp-tool-execute-dryrun",
-      "title": "Map Execute and DryRun to MCP tool calls with audit retained",
-      "description": "Map Execute and DryRun to MCP tool calls with audit retained",
+      "id": "t-vex-bootstrap",
+      "title": "Triage findings.json into .nox/vex.json",
+      "description": "Per-finding OpenVEX statement: status (not_affected | under_investigation), justification, impact_statement; covers every category in SECURITY.md",
+      "priority": "high",
+      "estimate": "4h",
+      "depends_on": [],
+      "feature_id": "f-vex-ci"
+    },
+    {
+      "id": "t-security-workflow",
+      "title": "Enable security.yml CI gate",
+      "description": "Mirror chronos pattern: nox scan on PR + push, diff against findings.json + vex.json, fail when unbaselined finding appears; SARIF upload to Code Scanning; artefact upload of SBOM",
       "priority": "high",
       "estimate": "2h",
       "depends_on": [
-        "t-mcp-server-bootstrap"
+        "t-vex-bootstrap"
       ],
-      "feature_id": "f18-mcp-surface"
+      "feature_id": "f-vex-ci"
+    },
+    {
+      "id": "t-policy-default-deny-mode",
+      "title": "Implement default-deny mode driven by PRAXIS_POLICY_MODE",
+      "description": "Implement default-deny mode driven by PRAXIS_POLICY_MODE",
+      "priority": "medium",
+      "estimate": "1h",
+      "depends_on": [],
+      "feature_id": "f10-policy-engine-v2"
     },
     {
       "id": "t-policy-priority-ordering",
@@ -263,26 +117,6 @@
       "estimate": "1h",
       "depends_on": [],
       "feature_id": "f10-policy-engine-v2"
-    },
-    {
-      "id": "t-cli-caps-org-flag",
-      "title": "praxis caps list/show accept --org and --team",
-      "description": "Both CLI subcommands accept --org and --team; resolve into CallerRef; route through ListCapabilitiesForCaller / GetCapabilityForCaller. No flag = anonymous = global view. e2e test against in-memory backend covers both.",
-      "priority": "high",
-      "estimate": "1h",
-      "depends_on": [],
-      "feature_id": "f-mcp-cli-tenant-discovery"
-    },
-    {
-      "id": "t-plugin-sighup-rescan",
-      "title": "SIGHUP forces full plugin re-scan",
-      "description": "Signal handler in cmd/praxis re-runs the full discover→verify→load pipeline; non-watch deployments rely on this for rotation. Idempotent: an unchanged plugin is not re-loaded.",
-      "priority": "medium",
-      "estimate": "1h",
-      "depends_on": [
-        "t-plugin-fsnotify-watch"
-      ],
-      "feature_id": "f-plugin-lifecycle"
     },
     {
       "id": "t-audit-replay-test",
@@ -297,17 +131,6 @@
       "feature_id": "f5-audit-log"
     },
     {
-      "id": "t-plugin-resource-sandbox",
-      "title": "CPU/memory/network-egress sandbox for plugin handlers",
-      "description": "CPU/memory/network-egress sandbox for plugin handlers",
-      "priority": "high",
-      "estimate": "6h",
-      "depends_on": [
-        "t-plugin-handler-abi"
-      ],
-      "feature_id": "f17-plugin-architecture"
-    },
-    {
       "id": "t-executor-dryrun",
       "title": "Implement Executor.DryRun flow",
       "description": "DryRun per TDD section 5.3 - resolve, validate, policy, handler.Simulate (or best-effort preview), audit row with Status=simulated. Zero vendor side effects. Acceptance: tests verify no outbound vendor calls; preview validated against OutputSchema where simulatable.",
@@ -319,135 +142,6 @@
       "feature_id": "f4-executor"
     },
     {
-      "id": "t-handler-slack-send-message",
-      "title": "Implement Slack send_message handler",
-      "description": "internal/handlers/slack/send_message.go using Slack Web API. Forward client_msg_id as idempotency key. Implement Simulate. Vendor-sandboxed integration test (skipped without SLACK_TEST_TOKEN). Acceptance: re-executing same Action.ID never posts twice in the sandbox.",
-      "priority": "high",
-      "estimate": "3h",
-      "depends_on": [
-        "t-executor-execute"
-      ],
-      "feature_id": "f6-real-handlers"
-    },
-    {
-      "id": "t-repository-ports",
-      "title": "Define repository ports",
-      "description": "internal/ports/ with CapabilityRepo, ActionRepo, IdempotencyRepo, AuditRepo, PolicyRepo (Phase-2 stub) per TDD section 7.1. Plus MnemosWriter outbound port. Pure interfaces. Acceptance: interfaces compile; godoc covers contract semantics.",
-      "priority": "high",
-      "estimate": "1h",
-      "depends_on": [
-        "t-domain-types"
-      ],
-      "feature_id": "f2-domain-storage-foundation"
-    },
-    {
-      "id": "t-store-test-suite",
-      "title": "Write shared store contract test suite",
-      "description": "internal/store/storetest/ - one RunSuite(t, repos) function exercising every repository port's contract. Used by all three backend tests. Acceptance: suite compiles; clear plug-in point for backend implementations.",
-      "priority": "high",
-      "estimate": "3h",
-      "depends_on": [
-        "t-repository-ports"
-      ],
-      "feature_id": "f2-domain-storage-foundation"
-    },
-    {
-      "id": "t-idempotency-keeper",
-      "title": "Implement IdempotencyKeeper",
-      "description": "internal/idempotency/ wrapping IdempotencyRepo. Lookup(key), Remember(key, result, ttl). Acceptance: re-execution with same key returns original Result without invoking handler.",
-      "priority": "high",
-      "estimate": "1h",
-      "depends_on": [
-        "t-store-memory",
-        "t-domain-types"
-      ],
-      "feature_id": "f4-executor"
-    },
-    {
-      "id": "t-store-sqlite",
-      "title": "Implement SQLite storage backend",
-      "description": "internal/store/sqlite/ with migrations/ (forward-only), sqlcgen/, port adapter. Schema per TDD section 7.4. modernc.org/sqlite. Acceptance: RunSuite passes; make sqlc clean.",
-      "priority": "high",
-      "estimate": "4h",
-      "depends_on": [
-        "t-store-memory",
-        "t-sqlc-config"
-      ],
-      "feature_id": "f2-domain-storage-foundation"
-    },
-    {
-      "id": "t-org-dashboards",
-      "title": "Org-level dashboards: capability usage, policy denials, error rates",
-      "description": "Org-level dashboards: capability usage, policy denials, error rates",
-      "priority": "high",
-      "estimate": "4h",
-      "depends_on": [],
-      "feature_id": "f21-compliance-governance"
-    },
-    {
-      "id": "t-observability",
-      "title": "Wire bolt logging, healthz, and Prometheus metrics",
-      "description": "Inject *bolt.Logger into every service constructor. /healthz on HTTP server. Metrics praxis_actions_total{capability,status}, praxis_action_duration_seconds, praxis_policy_decisions_total, praxis_idempotency_hits_total, praxis_outcome_emit_failures_total. Acceptance: curl /healthz returns 200; curl /metrics returns named series.",
-      "priority": "medium",
-      "estimate": "2h",
-      "depends_on": [
-        "t-http-axikernel"
-      ],
-      "feature_id": "f8-http-api-cli"
-    },
-    {
-      "id": "t-http-axikernel",
-      "title": "Implement HTTP API via axi-go",
-      "description": "cmd/praxis/axikernel.go wiring axi-go routes per docs/integrations.md section 2.1. Mirror Mnemos's axikernel pattern. Auth via PRAXIS_API_TOKEN. Acceptance: HTTP contract tests cover each endpoint's success and rejection paths.",
-      "priority": "high",
-      "estimate": "4h",
-      "depends_on": [
-        "t-executor-dryrun",
-        "t-audit-log"
-      ],
-      "feature_id": "f8-http-api-cli"
-    },
-    {
-      "id": "t-mcp-tenant-list-caps",
-      "title": "MCP ListCapabilities is caller-aware",
-      "description": "mcp-go session carries tenant identity via initialization metadata or per-request headers. Map session OrgID/TeamID into a CallerRef and route through Executor.ListCapabilitiesForCaller. Anonymous sessions get the global view.",
-      "priority": "high",
-      "estimate": "2h",
-      "depends_on": [],
-      "feature_id": "f-mcp-cli-tenant-discovery"
-    },
-    {
-      "id": "t-capability-compensate",
-      "title": "Capability.Compensate(ctx, originalResult) interface + executor wiring",
-      "description": "Capability.Compensate(ctx, originalResult) interface + executor wiring",
-      "priority": "high",
-      "estimate": "3h",
-      "depends_on": [],
-      "feature_id": "f20-reversibility"
-    },
-    {
-      "id": "t-tenant-audit-retention",
-      "title": "Per-tenant audit retention windows + access controls",
-      "description": "Per-tenant audit retention windows + access controls",
-      "priority": "high",
-      "estimate": "3h",
-      "depends_on": [
-        "t-tenant-scope-hierarchy"
-      ],
-      "feature_id": "f19-multi-tenant-policy"
-    },
-    {
-      "id": "t-handler-smtp-send-email",
-      "title": "Implement SMTP send_email handler",
-      "description": "internal/handlers/email/send_email.go using net/smtp. Deterministic Message-ID from idempotency key. Implement Simulate. Vendor-sandboxed integration test against MailHog (skipped without SMTP_TEST_HOST). Acceptance: duplicate sends produce single message at destination.",
-      "priority": "high",
-      "estimate": "3h",
-      "depends_on": [
-        "t-executor-execute"
-      ],
-      "feature_id": "f6-real-handlers"
-    },
-    {
       "id": "t-plugin-handler-abi",
       "title": "Stable Go handler ABI + version contract for out-of-tree handlers",
       "description": "Stable Go handler ABI + version contract for out-of-tree handlers",
@@ -457,26 +151,60 @@
       "feature_id": "f17-plugin-architecture"
     },
     {
-      "id": "t-handler-runner",
-      "title": "Implement HandlerRunner with timeouts and panic recovery",
-      "description": "internal/handlerrunner/ runs a Handler with per-capability timeout, recovers panics into structured ActionError. Classify errors retryable vs non-retryable. Acceptance: tests cover timeout, panic, returned error, clean success.",
+      "id": "t-audit-export-json-csv",
+      "title": "Audit export to JSON and CSV suitable for SOC2/HIPAA/GDPR review",
+      "description": "Audit export to JSON and CSV suitable for SOC2/HIPAA/GDPR review",
       "priority": "high",
-      "estimate": "1h",
-      "depends_on": [
-        "t-domain-types"
-      ],
-      "feature_id": "f4-executor"
+      "estimate": "3h",
+      "depends_on": [],
+      "feature_id": "f21-compliance-governance"
     },
     {
-      "id": "t-action-fsm",
-      "title": "Implement Action lifecycle FSM with statekit",
-      "description": "internal/domain/action_fsm.go using statekit. Encode transitions per TDD section 3.2. Forbidden transitions return errors. Acceptance: table-driven tests cover every allowed and forbidden transition.",
+      "id": "t-policy-throttled-audit-kind",
+      "title": "audit.KindThrottled emitted on rate-limited rejections",
+      "description": "audit.KindThrottled emitted on rate-limited rejections",
+      "priority": "medium",
+      "estimate": "30m",
+      "depends_on": [],
+      "feature_id": "f13-rate-limiting"
+    },
+    {
+      "id": "t-domain-types",
+      "title": "Define DDD domain types",
+      "description": "internal/domain/ with Capability, Action, ActionStatus, Result, Simulation, PolicyDecision, CallerRef, ActionError, AuditEvent per TDD section 3. Pure data, no I/O. Table-driven tests for invariants. Acceptance: go test ./internal/domain/... passes.",
       "priority": "high",
       "estimate": "2h",
       "depends_on": [
-        "t-domain-types"
+        "t-makefile"
       ],
       "feature_id": "f2-domain-storage-foundation"
+    },
+    {
+      "id": "t-handler-linear-create-issue",
+      "title": "Linear create_issue + transition_status handlers via Linear GraphQL",
+      "description": "Linear create_issue + transition_status handlers via Linear GraphQL",
+      "priority": "high",
+      "estimate": "3h",
+      "depends_on": [],
+      "feature_id": "f14-more-handlers"
+    },
+    {
+      "id": "t-schema-version-fields",
+      "title": "Capability gains InputSchemaVersion + OutputSchemaVersion",
+      "description": "domain.Capability fields; SQL migrations for capabilities table on sqlite + postgres; sqlc regen; backfill with v1 default",
+      "priority": "high",
+      "estimate": "2h",
+      "depends_on": [],
+      "feature_id": "f-schema-versioning"
+    },
+    {
+      "id": "t-handler-github-create-issue",
+      "title": "GitHub create_issue handler via go-github with idempotency at vendor",
+      "description": "GitHub create_issue handler via go-github with idempotency at vendor",
+      "priority": "high",
+      "estimate": "3h",
+      "depends_on": [],
+      "feature_id": "f14-more-handlers"
     },
     {
       "id": "t-plugin-load-metrics",
@@ -488,6 +216,61 @@
         "t-plugin-pipeline-loader"
       ],
       "feature_id": "f-plugin-pipeline-integration"
+    },
+    {
+      "id": "t-cli-plugins-subcommand",
+      "title": "praxis plugins list / reload CLI subcommand",
+      "description": "`praxis plugins list` prints loaded plugins with name, version, artefact digest, signature key, ABI; `praxis plugins reload \u003cname\u003e` posts to a privileged HTTP admin endpoint that forces single-plugin reload. Same auth model as /v1/admin (token-gated).",
+      "priority": "medium",
+      "estimate": "2h",
+      "depends_on": [
+        "t-plugin-fsnotify-watch"
+      ],
+      "feature_id": "f-plugin-lifecycle"
+    },
+    {
+      "id": "t-audit-purge-metrics",
+      "title": "praxis_audit_purge_total{org_id,result} + duration histogram",
+      "description": "Counter labelled by org_id and result=ok|error; histogram praxis_audit_purge_duration_seconds. Surfaces in /metrics.",
+      "priority": "medium",
+      "estimate": "1h",
+      "depends_on": [
+        "t-audit-retention-scheduler"
+      ],
+      "feature_id": "f-audit-retention-scheduler"
+    },
+    {
+      "id": "t-cli-revert-command",
+      "title": "praxis revert \u003caction-id\u003e CLI + HTTP endpoint with audit linkage",
+      "description": "praxis revert \u003caction-id\u003e CLI + HTTP endpoint with audit linkage",
+      "priority": "high",
+      "estimate": "2h",
+      "depends_on": [
+        "t-capability-compensate"
+      ],
+      "feature_id": "f20-reversibility"
+    },
+    {
+      "id": "t-plugin-fsnotify-watch",
+      "title": "fsnotify watch on PRAXIS_PLUGIN_DIR for hot reload",
+      "description": "Watcher triggers on manifest.json or .sig changes; re-runs Discover for the affected subdir; reloads on signature/ABI re-verification. PRAXIS_PLUGIN_AUTORELOAD=0 disables.",
+      "priority": "medium",
+      "estimate": "3h",
+      "depends_on": [
+        "t-plugin-pipeline-loader"
+      ],
+      "feature_id": "f-plugin-lifecycle"
+    },
+    {
+      "id": "t-cgroup-v2-spawn",
+      "title": "Spawn pluginhost into cgroup via CLONE_INTO_CGROUP",
+      "description": "Use unix.SchedSetattr or syscall raw clone3 with CLONE_INTO_CGROUP so child enters cgroup atomically; write memory.max + cpu.max from ResourceBudget before spawn; remove cgroup on plugin unload",
+      "priority": "high",
+      "estimate": "5h",
+      "depends_on": [
+        "t-cgroup-v2-detect"
+      ],
+      "feature_id": "f-cgroup-v2"
     },
     {
       "id": "t-store-postgres",
@@ -511,13 +294,112 @@
       "feature_id": "f14-more-handlers"
     },
     {
-      "id": "t-vendor-retry-after-header",
-      "title": "Parse Retry-After (delta-seconds or HTTP-date) and surface to fortify retry stra",
-      "description": "Parse Retry-After (delta-seconds or HTTP-date) and surface to fortify retry strategy",
+      "id": "t-capability-registry",
+      "title": "Implement CapabilityRegistry",
+      "description": "internal/capability/ with Register(handler), List(), Get(name). Concurrent-safe. Each handler declares its Capability metadata. Acceptance: tests cover duplicate, unknown, List ordering.",
+      "priority": "high",
+      "estimate": "1h",
+      "depends_on": [
+        "t-domain-types"
+      ],
+      "feature_id": "f3-capability-registry"
+    },
+    {
+      "id": "t-plugin-graceful-rollover",
+      "title": "Atomic plugin swap drains in-flight calls",
+      "description": "On reload, the old registration entries route remaining in-flight calls; new traffic immediately routes to the new version. Implemented via reference-counted handler wrapper that the registry swaps under lock.",
+      "priority": "medium",
+      "estimate": "3h",
+      "depends_on": [
+        "t-plugin-fsnotify-watch"
+      ],
+      "feature_id": "f-plugin-lifecycle"
+    },
+    {
+      "id": "t-mcp-federation-config",
+      "title": "mcp.federation.yaml config + parser",
+      "description": "internal/mcp/federation: parse config of upstream MCP servers (URL or stdio cmd, token, allowlist); env var PRAXIS_MCP_FEDERATION_CONFIG points at file",
       "priority": "high",
       "estimate": "2h",
       "depends_on": [],
-      "feature_id": "f15-vendor-retry-after"
+      "feature_id": "f-mcp-federation"
+    },
+    {
+      "id": "t-mcp-tool-execute-dryrun",
+      "title": "Map Execute and DryRun to MCP tool calls with audit retained",
+      "description": "Map Execute and DryRun to MCP tool calls with audit retained",
+      "priority": "high",
+      "estimate": "2h",
+      "depends_on": [
+        "t-mcp-server-bootstrap"
+      ],
+      "feature_id": "f18-mcp-surface"
+    },
+    {
+      "id": "t-store-sqlite",
+      "title": "Implement SQLite storage backend",
+      "description": "internal/store/sqlite/ with migrations/ (forward-only), sqlcgen/, port adapter. Schema per TDD section 7.4. modernc.org/sqlite. Acceptance: RunSuite passes; make sqlc clean.",
+      "priority": "high",
+      "estimate": "4h",
+      "depends_on": [
+        "t-store-memory",
+        "t-sqlc-config"
+      ],
+      "feature_id": "f2-domain-storage-foundation"
+    },
+    {
+      "id": "t-http-axikernel",
+      "title": "Implement HTTP API via axi-go",
+      "description": "cmd/praxis/axikernel.go wiring axi-go routes per docs/integrations.md section 2.1. Mirror Mnemos's axikernel pattern. Auth via PRAXIS_API_TOKEN. Acceptance: HTTP contract tests cover each endpoint's success and rejection paths.",
+      "priority": "high",
+      "estimate": "4h",
+      "depends_on": [
+        "t-executor-dryrun",
+        "t-audit-log"
+      ],
+      "feature_id": "f8-http-api-cli"
+    },
+    {
+      "id": "t-plugin-loader-strict-mode",
+      "title": "PRAXIS_PLUGIN_STRICT refuses startup on any load failure",
+      "description": "Add cfg.PluginStrict bool. When set, any per-plugin load error (verification, ABI mismatch, dlopen, registration conflict) aborts bootstrap with a structured error. Default off so unsigned dev plugins fail soft.",
+      "priority": "high",
+      "estimate": "1h",
+      "depends_on": [
+        "t-plugin-pipeline-loader"
+      ],
+      "feature_id": "f-plugin-pipeline-integration"
+    },
+    {
+      "id": "t-policy-fail-closed-on-repo-error",
+      "title": "PolicyRepo errors return deny with rule_id=rules_unavailable",
+      "description": "PolicyRepo errors return deny with rule_id=rules_unavailable",
+      "priority": "medium",
+      "estimate": "30m",
+      "depends_on": [],
+      "feature_id": "f10-policy-engine-v2"
+    },
+    {
+      "id": "t-store-memory",
+      "title": "Implement in-memory storage backend (reference)",
+      "description": "internal/store/memory/ implementing every repo port using mutex-guarded maps. Canonical reference. Acceptance: RunSuite passes against memory backend.",
+      "priority": "high",
+      "estimate": "3h",
+      "depends_on": [
+        "t-store-test-suite"
+      ],
+      "feature_id": "f2-domain-storage-foundation"
+    },
+    {
+      "id": "t-observability",
+      "title": "Wire bolt logging, healthz, and Prometheus metrics",
+      "description": "Inject *bolt.Logger into every service constructor. /healthz on HTTP server. Metrics praxis_actions_total{capability,status}, praxis_action_duration_seconds, praxis_policy_decisions_total, praxis_idempotency_hits_total, praxis_outcome_emit_failures_total. Acceptance: curl /healthz returns 200; curl /metrics returns named series.",
+      "priority": "medium",
+      "estimate": "2h",
+      "depends_on": [
+        "t-http-axikernel"
+      ],
+      "feature_id": "f8-http-api-cli"
     },
     {
       "id": "t-config-env",
@@ -533,68 +415,6 @@
       "feature_id": "f2-domain-storage-foundation"
     },
     {
-      "id": "t-async-202-response",
-      "title": "POST /v1/actions returns 202 Accepted for mode=async",
-      "description": "POST /v1/actions returns 202 Accepted for mode=async",
-      "priority": "medium",
-      "estimate": "30m",
-      "depends_on": [],
-      "feature_id": "f11-async-actions"
-    },
-    {
-      "id": "t-mcp-tool-discovery",
-      "title": "Map ListCapabilities to MCP tool discovery; agent-go-consumable descriptors",
-      "description": "Map ListCapabilities to MCP tool discovery; agent-go-consumable descriptors",
-      "priority": "high",
-      "estimate": "2h",
-      "depends_on": [
-        "t-mcp-server-bootstrap"
-      ],
-      "feature_id": "f18-mcp-surface"
-    },
-    {
-      "id": "t-capability-registry",
-      "title": "Implement CapabilityRegistry",
-      "description": "internal/capability/ with Register(handler), List(), Get(name). Concurrent-safe. Each handler declares its Capability metadata. Acceptance: tests cover duplicate, unknown, List ordering.",
-      "priority": "high",
-      "estimate": "1h",
-      "depends_on": [
-        "t-domain-types"
-      ],
-      "feature_id": "f3-capability-registry"
-    },
-    {
-      "id": "t-cli-revert-command",
-      "title": "praxis revert \u003caction-id\u003e CLI + HTTP endpoint with audit linkage",
-      "description": "praxis revert \u003caction-id\u003e CLI + HTTP endpoint with audit linkage",
-      "priority": "high",
-      "estimate": "2h",
-      "depends_on": [
-        "t-capability-compensate"
-      ],
-      "feature_id": "f20-reversibility"
-    },
-    {
-      "id": "t-audit-export-json-csv",
-      "title": "Audit export to JSON and CSV suitable for SOC2/HIPAA/GDPR review",
-      "description": "Audit export to JSON and CSV suitable for SOC2/HIPAA/GDPR review",
-      "priority": "high",
-      "estimate": "3h",
-      "depends_on": [],
-      "feature_id": "f21-compliance-governance"
-    },
-    {
-      "id": "t-async-webhook-callback",
-      "title": "Action.CallbackURL: HMAC-signed POST on terminal status",
-      "description": "Action.CallbackURL: post terminal Result with HMAC signature; outbox-backed retry",
-      "priority": "high",
-      "estimate": "3h",
-      "depends_on": [
-        "t-async-jobs-runner"
-      ],
-      "feature_id": "f16-async-webhooks"
-    },
-    {
       "id": "t-schema-validator",
       "title": "Implement schema validator",
       "description": "internal/schema/ supporting JSON Schema (primary) and Go-struct registration. Validate input on Execute, output on handler return. Acceptance: tests cover valid, malformed, missing-field, extra-field inputs.",
@@ -606,93 +426,73 @@
       "feature_id": "f3-capability-registry"
     },
     {
-      "id": "t-plugin-loader-strict-mode",
-      "title": "PRAXIS_PLUGIN_STRICT refuses startup on any load failure",
-      "description": "Add cfg.PluginStrict bool. When set, any per-plugin load error (verification, ABI mismatch, dlopen, registration conflict) aborts bootstrap with a structured error. Default off so unsigned dev plugins fail soft.",
-      "priority": "high",
-      "estimate": "1h",
-      "depends_on": [
-        "t-plugin-pipeline-loader"
-      ],
-      "feature_id": "f-plugin-pipeline-integration"
-    },
-    {
-      "id": "t-pluginhost-binary",
-      "title": "praxis-pluginhost child binary scaffolding",
-      "description": "cmd/praxis-pluginhost: minimal binary that loads one plugin from a path argument, exposes its Plugin interface over gRPC on stdin/stdout. Parent \u003c-\u003e child protocol covers ABI(), Manifest(), Capabilities(), and per-call Execute/Simulate routing. Phase 4 milestone bootstrap.",
-      "priority": "high",
-      "estimate": "6h",
-      "depends_on": [],
-      "feature_id": "f-plugin-out-of-process"
-    },
-    {
-      "id": "t-go-client",
-      "title": "Implement public Go client",
-      "description": "client/ mirroring Mnemos client patterns - New(baseURL, opts...), WithToken, WithLogger (bolt), WithRetry (fortify). Methods ListCapabilities, Execute, DryRun, GetAction. APIError type. Concurrent-safe. Acceptance: client tests against httptest server cover happy path, retry-on-5xx, fail-fast-on-4xx.",
-      "priority": "high",
-      "estimate": "3h",
-      "depends_on": [
-        "t-http-axikernel"
-      ],
-      "feature_id": "f9-public-client"
-    },
-    {
-      "id": "t-policy-default-deny-mode",
-      "title": "Implement default-deny mode driven by PRAXIS_POLICY_MODE",
-      "description": "Implement default-deny mode driven by PRAXIS_POLICY_MODE",
+      "id": "t-rate-limiter",
+      "title": "internal/limiter package wrapping fortify/ratelimit per cap+caller",
+      "description": "internal/limiter package wrapping fortify/ratelimit per cap+caller",
       "priority": "medium",
-      "estimate": "1h",
-      "depends_on": [],
-      "feature_id": "f10-policy-engine-v2"
-    },
-    {
-      "id": "t-license",
-      "title": "Add MIT LICENSE",
-      "description": "MIT license file matching Mnemos's. README already references it. Acceptance: file exists; copyright names Felix Geelhaar.",
-      "priority": "medium",
-      "estimate": "10m",
-      "depends_on": [],
-      "feature_id": "f1-foundation-scaffolding"
-    },
-    {
-      "id": "t-sqlc-config",
-      "title": "Configure sqlc.yaml for SQLite and Postgres engines",
-      "description": "Two engines per TDD section 7.2 - sqlite (database/sql) and postgresql (pgx/v5). Generated code into internal/store/sqlite/sqlcgen and internal/store/postgres/sqlcgen. Acceptance: make sqlc exits 0 even with empty queries files.",
-      "priority": "high",
-      "estimate": "30m",
-      "depends_on": [
-        "t-init-go-module"
-      ],
-      "feature_id": "f1-foundation-scaffolding"
-    },
-    {
-      "id": "t-policy-throttled-audit-kind",
-      "title": "audit.KindThrottled emitted on rate-limited rejections",
-      "description": "audit.KindThrottled emitted on rate-limited rejections",
-      "priority": "medium",
-      "estimate": "30m",
+      "estimate": "2h",
       "depends_on": [],
       "feature_id": "f13-rate-limiting"
     },
     {
-      "id": "t-policy-fail-closed-on-repo-error",
-      "title": "PolicyRepo errors return deny with rule_id=rules_unavailable",
-      "description": "PolicyRepo errors return deny with rule_id=rules_unavailable",
-      "priority": "medium",
-      "estimate": "30m",
+      "id": "t-mcp-server-bootstrap",
+      "title": "mcp-go server scaffolding sharing the executor with HTTP surface",
+      "description": "mcp-go server scaffolding sharing the executor with HTTP surface",
+      "priority": "high",
+      "estimate": "2h",
       "depends_on": [],
-      "feature_id": "f10-policy-engine-v2"
+      "feature_id": "f18-mcp-surface"
     },
     {
-      "id": "t-makefile",
-      "title": "Add Makefile mirroring Mnemos targets",
-      "description": "Targets fmt, lint, test, build, check, sqlc, install, release-check. Mirror Mnemos's structure with version/commit/build-date ldflags. Acceptance: make check runs go fmt, go vet, golangci-lint run, go test ./..., and go build.",
+      "id": "t-audit-log",
+      "title": "Implement AuditLog append and queries",
+      "description": "internal/audit/ with Append(ev) and Search(query). Lifecycle kinds received, validated, policy, executed, succeeded, failed, simulated. Backed by AuditRepo. Acceptance: every Executor branch writes expected audit events; search filters work.",
       "priority": "high",
-      "estimate": "30m",
+      "estimate": "2h",
       "depends_on": [
-        "t-init-go-module"
+        "t-executor-execute"
       ],
-      "feature_id": "f1-foundation-scaffolding"
+      "feature_id": "f5-audit-log"
+    },
+    {
+      "id": "t-async-jobs-runner",
+      "title": "jobs.Runner polling drainer + Executor.Resume",
+      "description": "jobs.Runner polling drainer + Executor.Resume",
+      "priority": "medium",
+      "estimate": "2h",
+      "depends_on": [],
+      "feature_id": "f11-async-actions"
+    },
+    {
+      "id": "t-bench-ci-regression",
+      "title": "make bench-check + CI regression detection",
+      "description": "Compare current bench against last-tagged baseline; fail CI if p50 regresses \u003e20%; benchstat in github-actions workflow",
+      "priority": "medium",
+      "estimate": "2h",
+      "depends_on": [
+        "t-bench-suite-scaffolding"
+      ],
+      "feature_id": "f-perf-benchmarks"
+    },
+    {
+      "id": "t-pluginhost-resource-limits",
+      "title": "cgroups + setrlimit applied to plugin child process",
+      "description": "On Linux apply cgroup v2 memory.max and cpu.max from ResourceBudget; on darwin/BSD use setrlimit(RLIMIT_AS, RLIMIT_CPU) as best-effort. Network egress filtered at the firewall via supplied http.Client (carried over from in-process sandbox).",
+      "priority": "high",
+      "estimate": "4h",
+      "depends_on": [
+        "t-pluginhost-binary"
+      ],
+      "feature_id": "f-plugin-out-of-process"
+    },
+    {
+      "id": "t-capability-compensate",
+      "title": "Capability.Compensate(ctx, originalResult) interface + executor wiring",
+      "description": "Capability.Compensate(ctx, originalResult) interface + executor wiring",
+      "priority": "high",
+      "estimate": "3h",
+      "depends_on": [],
+      "feature_id": "f20-reversibility"
     },
     {
       "id": "t-executor-execute",
@@ -711,66 +511,49 @@
       "feature_id": "f4-executor"
     },
     {
-      "id": "t-cli-plugins-subcommand",
-      "title": "praxis plugins list / reload CLI subcommand",
-      "description": "`praxis plugins list` prints loaded plugins with name, version, artefact digest, signature key, ABI; `praxis plugins reload \u003cname\u003e` posts to a privileged HTTP admin endpoint that forces single-plugin reload. Same auth model as /v1/admin (token-gated).",
-      "priority": "medium",
-      "estimate": "2h",
-      "depends_on": [
-        "t-plugin-fsnotify-watch"
-      ],
-      "feature_id": "f-plugin-lifecycle"
-    },
-    {
-      "id": "t-audit-retention-scheduler",
-      "title": "Background scheduler runs Service.PurgeExpired",
-      "description": "internal/audit/scheduler.go with Run(ctx) that ticks every PRAXIS_AUDIT_RETENTION_INTERVAL (default 1h, first tick after 5m). Per-tenant errors logged, sweep continues. Cancels on ctx done. cmd/praxis bootstrap launches goroutine.",
+      "id": "t-policy-engine-v0",
+      "title": "Implement Phase-1 PolicyEngine (global allow)",
+      "description": "internal/policy/ with Evaluate(ctx, capability, action) PolicyDecision. Global allow-list with explainable decisions. Rule, decision, reason, timestamp on every action. Structure ready for Phase-2 scoped rules. Acceptance: every Execute and DryRun records a PolicyDecision.",
       "priority": "high",
-      "estimate": "2h",
-      "depends_on": [],
-      "feature_id": "f-audit-retention-scheduler"
-    },
-    {
-      "id": "t-plugin-graceful-rollover",
-      "title": "Atomic plugin swap drains in-flight calls",
-      "description": "On reload, the old registration entries route remaining in-flight calls; new traffic immediately routes to the new version. Implemented via reference-counted handler wrapper that the registry swaps under lock.",
-      "priority": "medium",
-      "estimate": "3h",
+      "estimate": "1h",
       "depends_on": [
-        "t-plugin-fsnotify-watch"
+        "t-domain-types"
       ],
-      "feature_id": "f-plugin-lifecycle"
+      "feature_id": "f4-executor"
     },
     {
-      "id": "t-handler-github-comment",
-      "title": "GitHub create_issue_comment handler",
-      "description": "GitHub create_issue_comment handler",
-      "priority": "high",
-      "estimate": "2h",
-      "depends_on": [
-        "t-handler-github-create-issue"
-      ],
-      "feature_id": "f14-more-handlers"
-    },
-    {
-      "id": "t-handler-http-request",
-      "title": "Generic http_request handler with method/url/headers/body/json + Idempotency-Key",
-      "description": "Generic http_request handler with method/url/headers/body/json + Idempotency-Key forwarding",
-      "priority": "medium",
-      "estimate": "2h",
-      "depends_on": [],
-      "feature_id": "f14-more-handlers"
-    },
-    {
-      "id": "t-store-memory",
-      "title": "Implement in-memory storage backend (reference)",
-      "description": "internal/store/memory/ implementing every repo port using mutex-guarded maps. Canonical reference. Acceptance: RunSuite passes against memory backend.",
+      "id": "t-otel-executor-spans",
+      "title": "Executor opens spans for Execute/DryRun/Resume/Revert",
+      "description": "internal/executor: per-action span with attrs capability, action_id, status, policy_decision, org_id, team_id; lifecycle events as span events; child span around handler runner.RunWithCapability",
       "priority": "high",
       "estimate": "3h",
       "depends_on": [
-        "t-store-test-suite"
+        "t-otel-tracer-bootstrap"
       ],
-      "feature_id": "f2-domain-storage-foundation"
+      "feature_id": "f-otel-tracing"
+    },
+    {
+      "id": "t-outcome-emitter",
+      "title": "Implement OutcomeEmitter (Mnemos writeback)",
+      "description": "internal/outcome/ posting praxis.action_completed events to Mnemos POST /v1/events. fortify/retry with Mnemos-equivalent defaults (5xx + 429 retry, 4xx fail fast, exponential backoff with jitter). Outbox in configured backend; background worker drains. Never blocks Execute. Acceptance: integration test against test Mnemos; metrics expose emit failures.",
+      "priority": "high",
+      "estimate": "3h",
+      "depends_on": [
+        "t-executor-execute",
+        "t-store-memory"
+      ],
+      "feature_id": "f7-outcome-writeback"
+    },
+    {
+      "id": "t-async-webhook-callback",
+      "title": "Action.CallbackURL: HMAC-signed POST on terminal status",
+      "description": "Action.CallbackURL: post terminal Result with HMAC signature; outbox-backed retry",
+      "priority": "high",
+      "estimate": "3h",
+      "depends_on": [
+        "t-async-jobs-runner"
+      ],
+      "feature_id": "f16-async-webhooks"
     },
     {
       "id": "t-gitignore-editorconfig",
@@ -797,53 +580,42 @@
       "feature_id": "f8-http-api-cli"
     },
     {
-      "id": "t-rate-limiter",
-      "title": "internal/limiter package wrapping fortify/ratelimit per cap+caller",
-      "description": "internal/limiter package wrapping fortify/ratelimit per cap+caller",
-      "priority": "medium",
-      "estimate": "2h",
-      "depends_on": [],
-      "feature_id": "f13-rate-limiting"
-    },
-    {
-      "id": "t-per-cap-retry-runtime",
-      "title": "HandlerRunner.RunWithCapability per-call retry from cap.Retry",
-      "description": "HandlerRunner.RunWithCapability builds per-call retry strategy from cap.Retry",
-      "priority": "medium",
-      "estimate": "1h",
-      "depends_on": [],
-      "feature_id": "f12-per-cap-retry"
-    },
-    {
-      "id": "t-plugin-on-disk-discovery",
-      "title": "On-disk plugin discovery via PRAXIS_PLUGIN_DIR + manifest.json",
-      "description": "On-disk plugin discovery via PRAXIS_PLUGIN_DIR with manifest.json",
+      "id": "t-tenant-scope-hierarchy",
+      "title": "Org/team/user scope hierarchy in PolicyRule + Action.Caller",
+      "description": "Org/team/user scope hierarchy in PolicyRule + Action.Caller",
       "priority": "high",
-      "estimate": "3h",
-      "depends_on": [
-        "t-plugin-handler-abi"
-      ],
-      "feature_id": "f17-plugin-architecture"
+      "estimate": "4h",
+      "depends_on": [],
+      "feature_id": "f19-multi-tenant-policy"
     },
     {
-      "id": "t-domain-types",
-      "title": "Define DDD domain types",
-      "description": "internal/domain/ with Capability, Action, ActionStatus, Result, Simulation, PolicyDecision, CallerRef, ActionError, AuditEvent per TDD section 3. Pure data, no I/O. Table-driven tests for invariants. Acceptance: go test ./internal/domain/... passes.",
+      "id": "t-mcp-tool-discovery",
+      "title": "Map ListCapabilities to MCP tool discovery; agent-go-consumable descriptors",
+      "description": "Map ListCapabilities to MCP tool discovery; agent-go-consumable descriptors",
       "priority": "high",
       "estimate": "2h",
       "depends_on": [
-        "t-makefile"
+        "t-mcp-server-bootstrap"
       ],
-      "feature_id": "f2-domain-storage-foundation"
+      "feature_id": "f18-mcp-surface"
     },
     {
-      "id": "t-audit-pii-redaction",
-      "title": "Configurable PII redaction policy applied at audit detail level",
-      "description": "Configurable PII redaction policy applied at audit detail level",
+      "id": "t-audit-retention-scheduler",
+      "title": "Background scheduler runs Service.PurgeExpired",
+      "description": "internal/audit/scheduler.go with Run(ctx) that ticks every PRAXIS_AUDIT_RETENTION_INTERVAL (default 1h, first tick after 5m). Per-tenant errors logged, sweep continues. Cancels on ctx done. cmd/praxis bootstrap launches goroutine.",
       "priority": "high",
-      "estimate": "3h",
+      "estimate": "2h",
       "depends_on": [],
-      "feature_id": "f21-compliance-governance"
+      "feature_id": "f-audit-retention-scheduler"
+    },
+    {
+      "id": "t-handler-http-request",
+      "title": "Generic http_request handler with method/url/headers/body/json + Idempotency-Key",
+      "description": "Generic http_request handler with method/url/headers/body/json + Idempotency-Key forwarding",
+      "priority": "medium",
+      "estimate": "2h",
+      "depends_on": [],
+      "feature_id": "f14-more-handlers"
     },
     {
       "id": "t-async-mode-schema-and-port",
@@ -855,18 +627,9 @@
       "feature_id": "f11-async-actions"
     },
     {
-      "id": "t-init-go-module",
-      "title": "Initialize Go module and pin foundation libraries",
-      "description": "go mod init github.com/felixgeelhaar/praxis (Go 1.25+). Add bolt v1.3.0, fortify v1.2.1, mcp-go v1.9.0, statekit v1.3.2, axi-go v1.2.0 at the same versions Mnemos uses. Acceptance: go mod tidy clean; go build ./... works.",
-      "priority": "high",
-      "estimate": "1h",
-      "depends_on": [],
-      "feature_id": "f1-foundation-scaffolding"
-    },
-    {
-      "id": "t-policy-engine-v0",
-      "title": "Implement Phase-1 PolicyEngine (global allow)",
-      "description": "internal/policy/ with Evaluate(ctx, capability, action) PolicyDecision. Global allow-list with explainable decisions. Rule, decision, reason, timestamp on every action. Structure ready for Phase-2 scoped rules. Acceptance: every Execute and DryRun records a PolicyDecision.",
+      "id": "t-handler-runner",
+      "title": "Implement HandlerRunner with timeouts and panic recovery",
+      "description": "internal/handlerrunner/ runs a Handler with per-capability timeout, recovers panics into structured ActionError. Classify errors retryable vs non-retryable. Acceptance: tests cover timeout, panic, returned error, clean success.",
       "priority": "high",
       "estimate": "1h",
       "depends_on": [
@@ -875,15 +638,15 @@
       "feature_id": "f4-executor"
     },
     {
-      "id": "t-audit-purge-metrics",
-      "title": "praxis_audit_purge_total{org_id,result} + duration histogram",
-      "description": "Counter labelled by org_id and result=ok|error; histogram praxis_audit_purge_duration_seconds. Surfaces in /metrics.",
-      "priority": "medium",
-      "estimate": "1h",
+      "id": "t-makefile",
+      "title": "Add Makefile mirroring Mnemos targets",
+      "description": "Targets fmt, lint, test, build, check, sqlc, install, release-check. Mirror Mnemos's structure with version/commit/build-date ldflags. Acceptance: make check runs go fmt, go vet, golangci-lint run, go test ./..., and go build.",
+      "priority": "high",
+      "estimate": "30m",
       "depends_on": [
-        "t-audit-retention-scheduler"
+        "t-init-go-module"
       ],
-      "feature_id": "f-audit-retention-scheduler"
+      "feature_id": "f1-foundation-scaffolding"
     },
     {
       "id": "t-plugin-signature-verification",
@@ -897,15 +660,6 @@
       "feature_id": "f17-plugin-architecture"
     },
     {
-      "id": "t-mcp-server-bootstrap",
-      "title": "mcp-go server scaffolding sharing the executor with HTTP surface",
-      "description": "mcp-go server scaffolding sharing the executor with HTTP surface",
-      "priority": "high",
-      "estimate": "2h",
-      "depends_on": [],
-      "feature_id": "f18-mcp-surface"
-    },
-    {
       "id": "t-plugin-pipeline-loader",
       "title": "Wire plugin discover→verify→Load into bootstrap",
       "description": "cmd/praxis/main.go bootstrap calls plugin.Discover(cfg.PluginDir), then plugin.LoadTrustedKeys(cfg.PluginTrustedKeys), then for each Discovered: plugin.VerifyDiscovered then dlopen artefact, look up `Plugin` symbol, plugin.Load(ctx, p, registryLoader). Wrap registry as plugin.Loader. Acceptance: a signed test plugin appearing under PRAXIS_PLUGIN_DIR shows up in /v1/capabilities.",
@@ -915,56 +669,400 @@
       "feature_id": "f-plugin-pipeline-integration"
     },
     {
-      "id": "t-plugin-fsnotify-watch",
-      "title": "fsnotify watch on PRAXIS_PLUGIN_DIR for hot reload",
-      "description": "Watcher triggers on manifest.json or .sig changes; re-runs Discover for the affected subdir; reloads on signature/ABI re-verification. PRAXIS_PLUGIN_AUTORELOAD=0 disables.",
+      "id": "t-otel-mcp-spans",
+      "title": "MCP server inherits span from incoming session",
+      "description": "internal/mcp: extract context from session metadata if upstream sent one, else open root span; tool calls become child spans",
       "priority": "medium",
-      "estimate": "3h",
+      "estimate": "1h",
       "depends_on": [
-        "t-plugin-pipeline-loader"
+        "t-otel-tracer-bootstrap"
       ],
-      "feature_id": "f-plugin-lifecycle"
+      "feature_id": "f-otel-tracing"
     },
     {
-      "id": "t-audit-log",
-      "title": "Implement AuditLog append and queries",
-      "description": "internal/audit/ with Append(ev) and Search(query). Lifecycle kinds received, validated, policy, executed, succeeded, failed, simulated. Backed by AuditRepo. Acceptance: every Executor branch writes expected audit events; search filters work.",
+      "id": "t-cgroup-v2-detect",
+      "title": "Detect cgroup v2 mount and delegated subtree at startup",
+      "description": "internal/plugin/cgroup: probe /sys/fs/cgroup/cgroup.controllers, /sys/fs/cgroup/praxis writability; fall back to setrlimit + log when unavailable",
       "priority": "high",
       "estimate": "2h",
+      "depends_on": [],
+      "feature_id": "f-cgroup-v2"
+    },
+    {
+      "id": "t-mcp-federation-client",
+      "title": "mcp-go client connects upstream + fetches tool catalogue",
+      "description": "Per-upstream goroutine maintains connection; reconnect on failure; surfaces tools via Watchable to the Manager",
+      "priority": "high",
+      "estimate": "4h",
+      "depends_on": [
+        "t-mcp-federation-config"
+      ],
+      "feature_id": "f-mcp-federation"
+    },
+    {
+      "id": "t-handler-slack-send-message",
+      "title": "Implement Slack send_message handler",
+      "description": "internal/handlers/slack/send_message.go using Slack Web API. Forward client_msg_id as idempotency key. Implement Simulate. Vendor-sandboxed integration test (skipped without SLACK_TEST_TOKEN). Acceptance: re-executing same Action.ID never posts twice in the sandbox.",
+      "priority": "high",
+      "estimate": "3h",
       "depends_on": [
         "t-executor-execute"
       ],
-      "feature_id": "f5-audit-log"
+      "feature_id": "f6-real-handlers"
     },
     {
-      "id": "t-async-jobs-runner",
-      "title": "jobs.Runner polling drainer + Executor.Resume",
-      "description": "jobs.Runner polling drainer + Executor.Resume",
+      "id": "t-bench-suite-scaffolding",
+      "title": "bench/ scaffolding with Execute hot-path benchmark",
+      "description": "BenchmarkExecute_Memory/Sqlite/Postgres against synthetic handler; -count=10 -benchmem; benchstat-friendly output",
+      "priority": "high",
+      "estimate": "3h",
+      "depends_on": [],
+      "feature_id": "f-perf-benchmarks"
+    },
+    {
+      "id": "t-bench-out-of-process",
+      "title": "Benchmark out-of-process IPC overhead",
+      "description": "BenchmarkExecute_ProcessOpener with fakeChild over real pipes; measure latency overhead per call vs in-process baseline",
       "priority": "medium",
       "estimate": "2h",
+      "depends_on": [
+        "t-bench-suite-scaffolding"
+      ],
+      "feature_id": "f-perf-benchmarks"
+    },
+    {
+      "id": "t-bench-publish-docs",
+      "title": "Auto-publish benchmark results to docs/benchmarks.md on tag",
+      "description": "Tag-triggered CI job runs full bench, formats with benchstat, opens PR updating docs/benchmarks.md",
+      "priority": "low",
+      "estimate": "1h",
+      "depends_on": [
+        "t-bench-ci-regression"
+      ],
+      "feature_id": "f-perf-benchmarks"
+    },
+    {
+      "id": "t-tenant-audit-retention",
+      "title": "Per-tenant audit retention windows + access controls",
+      "description": "Per-tenant audit retention windows + access controls",
+      "priority": "high",
+      "estimate": "3h",
+      "depends_on": [
+        "t-tenant-scope-hierarchy"
+      ],
+      "feature_id": "f19-multi-tenant-policy"
+    },
+    {
+      "id": "t-go-client",
+      "title": "Implement public Go client",
+      "description": "client/ mirroring Mnemos client patterns - New(baseURL, opts...), WithToken, WithLogger (bolt), WithRetry (fortify). Methods ListCapabilities, Execute, DryRun, GetAction. APIError type. Concurrent-safe. Acceptance: client tests against httptest server cover happy path, retry-on-5xx, fail-fast-on-4xx.",
+      "priority": "high",
+      "estimate": "3h",
+      "depends_on": [
+        "t-http-axikernel"
+      ],
+      "feature_id": "f9-public-client"
+    },
+    {
+      "id": "t-license",
+      "title": "Add MIT LICENSE",
+      "description": "MIT license file matching Mnemos's. README already references it. Acceptance: file exists; copyright names Felix Geelhaar.",
+      "priority": "medium",
+      "estimate": "10m",
+      "depends_on": [],
+      "feature_id": "f1-foundation-scaffolding"
+    },
+    {
+      "id": "t-sqlc-config",
+      "title": "Configure sqlc.yaml for SQLite and Postgres engines",
+      "description": "Two engines per TDD section 7.2 - sqlite (database/sql) and postgresql (pgx/v5). Generated code into internal/store/sqlite/sqlcgen and internal/store/postgres/sqlcgen. Acceptance: make sqlc exits 0 even with empty queries files.",
+      "priority": "high",
+      "estimate": "30m",
+      "depends_on": [
+        "t-init-go-module"
+      ],
+      "feature_id": "f1-foundation-scaffolding"
+    },
+    {
+      "id": "t-plugin-on-disk-discovery",
+      "title": "On-disk plugin discovery via PRAXIS_PLUGIN_DIR + manifest.json",
+      "description": "On-disk plugin discovery via PRAXIS_PLUGIN_DIR with manifest.json",
+      "priority": "high",
+      "estimate": "3h",
+      "depends_on": [
+        "t-plugin-handler-abi"
+      ],
+      "feature_id": "f17-plugin-architecture"
+    },
+    {
+      "id": "t-async-202-response",
+      "title": "POST /v1/actions returns 202 Accepted for mode=async",
+      "description": "POST /v1/actions returns 202 Accepted for mode=async",
+      "priority": "medium",
+      "estimate": "30m",
       "depends_on": [],
       "feature_id": "f11-async-actions"
     },
     {
-      "id": "t-handler-linear-create-issue",
-      "title": "Linear create_issue + transition_status handlers via Linear GraphQL",
-      "description": "Linear create_issue + transition_status handlers via Linear GraphQL",
-      "priority": "high",
-      "estimate": "3h",
-      "depends_on": [],
-      "feature_id": "f14-more-handlers"
+      "id": "t-cgroup-v2-usage-metrics",
+      "title": "Read memory.peak + cpu.stat at reload, surface in /metrics",
+      "description": "praxis_plugin_memory_peak_bytes{name} + praxis_plugin_cpu_seconds_total{name}; capture at watchCrash to attribute resource usage to the dead plugin",
+      "priority": "medium",
+      "estimate": "2h",
+      "depends_on": [
+        "t-cgroup-v2-spawn"
+      ],
+      "feature_id": "f-cgroup-v2"
     },
     {
-      "id": "t-tenant-scope-hierarchy",
-      "title": "Org/team/user scope hierarchy in PolicyRule + Action.Caller",
-      "description": "Org/team/user scope hierarchy in PolicyRule + Action.Caller",
+      "id": "t-plugin-resource-sandbox",
+      "title": "CPU/memory/network-egress sandbox for plugin handlers",
+      "description": "CPU/memory/network-egress sandbox for plugin handlers",
+      "priority": "high",
+      "estimate": "6h",
+      "depends_on": [
+        "t-plugin-handler-abi"
+      ],
+      "feature_id": "f17-plugin-architecture"
+    },
+    {
+      "id": "t-org-dashboards",
+      "title": "Org-level dashboards: capability usage, policy denials, error rates",
+      "description": "Org-level dashboards: capability usage, policy denials, error rates",
       "priority": "high",
       "estimate": "4h",
       "depends_on": [],
+      "feature_id": "f21-compliance-governance"
+    },
+    {
+      "id": "t-vendor-retry-after-header",
+      "title": "Parse Retry-After (delta-seconds or HTTP-date) and surface to fortify retry stra",
+      "description": "Parse Retry-After (delta-seconds or HTTP-date) and surface to fortify retry strategy",
+      "priority": "high",
+      "estimate": "2h",
+      "depends_on": [],
+      "feature_id": "f15-vendor-retry-after"
+    },
+    {
+      "id": "t-handler-github-comment",
+      "title": "GitHub create_issue_comment handler",
+      "description": "GitHub create_issue_comment handler",
+      "priority": "high",
+      "estimate": "2h",
+      "depends_on": [
+        "t-handler-github-create-issue"
+      ],
+      "feature_id": "f14-more-handlers"
+    },
+    {
+      "id": "t-audit-pii-redaction",
+      "title": "Configurable PII redaction policy applied at audit detail level",
+      "description": "Configurable PII redaction policy applied at audit detail level",
+      "priority": "high",
+      "estimate": "3h",
+      "depends_on": [],
+      "feature_id": "f21-compliance-governance"
+    },
+    {
+      "id": "t-init-go-module",
+      "title": "Initialize Go module and pin foundation libraries",
+      "description": "go mod init github.com/felixgeelhaar/praxis (Go 1.25+). Add bolt v1.3.0, fortify v1.2.1, mcp-go v1.9.0, statekit v1.3.2, axi-go v1.2.0 at the same versions Mnemos uses. Acceptance: go mod tidy clean; go build ./... works.",
+      "priority": "high",
+      "estimate": "1h",
+      "depends_on": [],
+      "feature_id": "f1-foundation-scaffolding"
+    },
+    {
+      "id": "t-schema-compat-checker",
+      "title": "Schema compatibility checker on Register",
+      "description": "internal/schema/compat.go: detect breaking changes (renamed required field, narrowed enum, tightened type); modes strict|warn|off via PRAXIS_SCHEMA_COMPAT",
+      "priority": "high",
+      "estimate": "4h",
+      "depends_on": [
+        "t-schema-version-fields"
+      ],
+      "feature_id": "f-schema-versioning"
+    },
+    {
+      "id": "t-pluginhost-crash-recovery",
+      "title": "Parent removes registration on child crash, increments metric",
+      "description": "Parent watches child process; SIGCHLD or read EOF on the IPC pipe deregisters every capability the plugin contributed and emits praxis_plugin_crash_total. Subsequent ListCapabilities omits the plugin until reload.",
+      "priority": "high",
+      "estimate": "2h",
+      "depends_on": [
+        "t-pluginhost-binary"
+      ],
+      "feature_id": "f-plugin-out-of-process"
+    },
+    {
+      "id": "t-tenant-private-capabilities",
+      "title": "Tenant-scoped capability registries so private caps stay isolated",
+      "description": "Tenant-scoped capability registries so private caps stay isolated",
+      "priority": "high",
+      "estimate": "3h",
+      "depends_on": [
+        "t-tenant-scope-hierarchy"
+      ],
       "feature_id": "f19-multi-tenant-policy"
+    },
+    {
+      "id": "t-plugin-sighup-rescan",
+      "title": "SIGHUP forces full plugin re-scan",
+      "description": "Signal handler in cmd/praxis re-runs the full discover→verify→load pipeline; non-watch deployments rely on this for rotation. Idempotent: an unchanged plugin is not re-loaded.",
+      "priority": "medium",
+      "estimate": "1h",
+      "depends_on": [
+        "t-plugin-fsnotify-watch"
+      ],
+      "feature_id": "f-plugin-lifecycle"
+    },
+    {
+      "id": "t-repository-ports",
+      "title": "Define repository ports",
+      "description": "internal/ports/ with CapabilityRepo, ActionRepo, IdempotencyRepo, AuditRepo, PolicyRepo (Phase-2 stub) per TDD section 7.1. Plus MnemosWriter outbound port. Pure interfaces. Acceptance: interfaces compile; godoc covers contract semantics.",
+      "priority": "high",
+      "estimate": "1h",
+      "depends_on": [
+        "t-domain-types"
+      ],
+      "feature_id": "f2-domain-storage-foundation"
+    },
+    {
+      "id": "t-action-fsm",
+      "title": "Implement Action lifecycle FSM with statekit",
+      "description": "internal/domain/action_fsm.go using statekit. Encode transitions per TDD section 3.2. Forbidden transitions return errors. Acceptance: table-driven tests cover every allowed and forbidden transition.",
+      "priority": "high",
+      "estimate": "2h",
+      "depends_on": [
+        "t-domain-types"
+      ],
+      "feature_id": "f2-domain-storage-foundation"
+    },
+    {
+      "id": "t-otel-tracer-bootstrap",
+      "title": "OTel tracer provider bootstrap + config",
+      "description": "Wire go.opentelemetry.io/otel + otlp gRPC exporter; PRAXIS_OTLP_ENDPOINT/PROTOCOL/SAMPLE config; tracer.Shutdown on SIGTERM; default off when endpoint empty",
+      "priority": "high",
+      "estimate": "3h",
+      "depends_on": [],
+      "feature_id": "f-otel-tracing"
+    },
+    {
+      "id": "t-schema-changelog-endpoint",
+      "title": "GET /v1/capabilities/{name} renders changelog",
+      "description": "Capability response includes per-version diff log; endpoint backed by capabilities_history table",
+      "priority": "medium",
+      "estimate": "3h",
+      "depends_on": [
+        "t-schema-compat-checker"
+      ],
+      "feature_id": "f-schema-versioning"
+    },
+    {
+      "id": "t-cli-caps-org-flag",
+      "title": "praxis caps list/show accept --org and --team",
+      "description": "Both CLI subcommands accept --org and --team; resolve into CallerRef; route through ListCapabilitiesForCaller / GetCapabilityForCaller. No flag = anonymous = global view. e2e test against in-memory backend covers both.",
+      "priority": "high",
+      "estimate": "1h",
+      "depends_on": [],
+      "feature_id": "f-mcp-cli-tenant-discovery"
+    },
+    {
+      "id": "t-handler-smtp-send-email",
+      "title": "Implement SMTP send_email handler",
+      "description": "internal/handlers/email/send_email.go using net/smtp. Deterministic Message-ID from idempotency key. Implement Simulate. Vendor-sandboxed integration test against MailHog (skipped without SMTP_TEST_HOST). Acceptance: duplicate sends produce single message at destination.",
+      "priority": "high",
+      "estimate": "3h",
+      "depends_on": [
+        "t-executor-execute"
+      ],
+      "feature_id": "f6-real-handlers"
+    },
+    {
+      "id": "t-per-cap-retry-runtime",
+      "title": "HandlerRunner.RunWithCapability per-call retry from cap.Retry",
+      "description": "HandlerRunner.RunWithCapability builds per-call retry strategy from cap.Retry",
+      "priority": "medium",
+      "estimate": "1h",
+      "depends_on": [],
+      "feature_id": "f12-per-cap-retry"
+    },
+    {
+      "id": "t-otel-handler-propagation",
+      "title": "Plugin HTTP client injects W3C traceparent on outbound requests",
+      "description": "internal/plugin sandbox HTTP client uses otelhttp.NewTransport so vendor latency joins the same trace; plugin authors call plugin.HTTPClient(ctx) unchanged",
+      "priority": "high",
+      "estimate": "2h",
+      "depends_on": [
+        "t-otel-tracer-bootstrap"
+      ],
+      "feature_id": "f-otel-tracing"
+    },
+    {
+      "id": "t-mcp-federation-handler",
+      "title": "federatedHandler routes Execute through executor pipeline",
+      "description": "Each upstream tool becomes a Capability; handler forwards Execute/Simulate via mcp-go client; audit detail records upstream identity",
+      "priority": "high",
+      "estimate": "3h",
+      "depends_on": [
+        "t-mcp-federation-client"
+      ],
+      "feature_id": "f-mcp-federation"
+    },
+    {
+      "id": "t-mcp-federation-failure-handling",
+      "title": "Upstream failure deregisters tools via Watchable pattern",
+      "description": "Reuses out-of-process loader's Watch contract; same crash-recovery wiring; metric praxis_mcp_federation_status{upstream,status}",
+      "priority": "high",
+      "estimate": "2h",
+      "depends_on": [
+        "t-mcp-federation-client"
+      ],
+      "feature_id": "f-mcp-federation"
+    },
+    {
+      "id": "t-store-test-suite",
+      "title": "Write shared store contract test suite",
+      "description": "internal/store/storetest/ - one RunSuite(t, repos) function exercising every repository port's contract. Used by all three backend tests. Acceptance: suite compiles; clear plug-in point for backend implementations.",
+      "priority": "high",
+      "estimate": "3h",
+      "depends_on": [
+        "t-repository-ports"
+      ],
+      "feature_id": "f2-domain-storage-foundation"
+    },
+    {
+      "id": "t-idempotency-keeper",
+      "title": "Implement IdempotencyKeeper",
+      "description": "internal/idempotency/ wrapping IdempotencyRepo. Lookup(key), Remember(key, result, ttl). Acceptance: re-execution with same key returns original Result without invoking handler.",
+      "priority": "high",
+      "estimate": "1h",
+      "depends_on": [
+        "t-store-memory",
+        "t-domain-types"
+      ],
+      "feature_id": "f4-executor"
+    },
+    {
+      "id": "t-mcp-tenant-list-caps",
+      "title": "MCP ListCapabilities is caller-aware",
+      "description": "mcp-go session carries tenant identity via initialization metadata or per-request headers. Map session OrgID/TeamID into a CallerRef and route through Executor.ListCapabilitiesForCaller. Anonymous sessions get the global view.",
+      "priority": "high",
+      "estimate": "2h",
+      "depends_on": [],
+      "feature_id": "f-mcp-cli-tenant-discovery"
+    },
+    {
+      "id": "t-pluginhost-binary",
+      "title": "praxis-pluginhost child binary scaffolding",
+      "description": "cmd/praxis-pluginhost: minimal binary that loads one plugin from a path argument, exposes its Plugin interface over gRPC on stdin/stdout. Parent \u003c-\u003e child protocol covers ABI(), Manifest(), Capabilities(), and per-call Execute/Simulate routing. Phase 4 milestone bootstrap.",
+      "priority": "high",
+      "estimate": "6h",
+      "depends_on": [],
+      "feature_id": "f-plugin-out-of-process"
     }
   ],
   "approval_status": "approved",
   "created_at": "2026-04-27T18:59:48.399869+02:00",
-  "updated_at": "2026-05-01T21:54:35.137198+02:00"
+  "updated_at": "2026-05-02T09:34:20.959668+02:00"
 }

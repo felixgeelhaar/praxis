@@ -1,6 +1,6 @@
 {
   "project_id": "Praxis",
-  "version": 81,
+  "version": 82,
   "task_states": {
     "t-action-fsm": {
       "status": "done",
@@ -189,6 +189,16 @@
       "completed_at": "2026-05-01T23:32:47.967244+02:00",
       "elapsed_minutes": 3
     },
+    "t-changelog-persist": {
+      "status": "pending",
+      "path": "",
+      "elapsed_minutes": 0
+    },
+    "t-changelog-schema": {
+      "status": "pending",
+      "path": "",
+      "elapsed_minutes": 0
+    },
     "t-cli-caps-org-flag": {
       "status": "done",
       "path": "",
@@ -258,6 +268,21 @@
       "started_at": "2026-05-01T08:32:46.25385Z",
       "completed_at": "2026-05-01T08:32:46.25385Z",
       "elapsed_minutes": 60
+    },
+    "t-fed-http-transport": {
+      "status": "pending",
+      "path": "",
+      "elapsed_minutes": 0
+    },
+    "t-fulcio-config": {
+      "status": "pending",
+      "path": "",
+      "elapsed_minutes": 0
+    },
+    "t-fulcio-verifier": {
+      "status": "pending",
+      "path": "",
+      "elapsed_minutes": 0
     },
     "t-gitignore-editorconfig": {
       "status": "done",
@@ -458,6 +483,16 @@
       "completed_at": "2026-05-01T13:01:38.077882Z",
       "elapsed_minutes": 60
     },
+    "t-mtls-client-ca": {
+      "status": "pending",
+      "path": "",
+      "elapsed_minutes": 0
+    },
+    "t-mtls-server": {
+      "status": "pending",
+      "path": "",
+      "elapsed_minutes": 0
+    },
     "t-observability": {
       "status": "done",
       "path": "",
@@ -517,6 +552,11 @@
       "started_at": "2026-05-01T22:00:29.225949+02:00",
       "completed_at": "2026-05-01T22:08:58.512744+02:00",
       "elapsed_minutes": 8
+    },
+    "t-out-of-process-default": {
+      "status": "pending",
+      "path": "",
+      "elapsed_minutes": 0
     },
     "t-outcome-emitter": {
       "status": "done",
@@ -768,6 +808,11 @@
       "completed_at": "2026-05-01T22:37:26.076236+02:00",
       "elapsed_minutes": 4
     },
+    "t-security-workflow": {
+      "status": "pending",
+      "path": "",
+      "elapsed_minutes": 0
+    },
     "t-sqlc-config": {
       "status": "done",
       "path": "",
@@ -845,6 +890,11 @@
       "started_at": "2026-05-01T11:01:33.7832Z",
       "completed_at": "2026-05-01T11:01:33.7832Z",
       "elapsed_minutes": 90
+    },
+    "t-vex-bootstrap": {
+      "status": "pending",
+      "path": "",
+      "elapsed_minutes": 0
     }
   },
   "updated_at": "2026-05-01T23:55:53.408764+02:00"

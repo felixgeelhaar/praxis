@@ -58,3 +58,39 @@ Praxis has no published latency or throughput targets. Operators have no way to 
 Praxis sits in the cognitive stack as the execution layer; agents reach it via MCP. Phase 5 turns Praxis into an MCP federation hub so an agent talking to one Praxis instance can reach every tool the operator has approved across multiple upstream MCP servers — without each tool re-implementing policy/audit. Implementation: cmd/praxis adds an mcp.federation.yaml config listing upstream MCP servers (URL or stdio command + token); a federation goroutine connects to each upstream, fetches its tool catalogue, and registers a federatedHandler per upstream tool. Calls flow through the same executor (policy → schema → idempotency → audit → emit) before being forwarded. Audit detail records the upstream server identity. Failures (upstream down, auth rejected) deregister gracefully via the same Watchable pattern the out-of-process loader uses. Schema is fetched at federation time and surfaced unchanged — operators see one tool catalogue. Phase 5's biggest ecosystem play.
 
 ---
+
+## MCP federation HTTP transport
+
+Phase 5 federation only supports stdio upstreams (mcp-go v1.9 limitation). When mcp-go ships an HTTP / SSE transport — already on its roadmap — wire URL-based upstreams in mcp.federation.yaml: HTTPS connection with Bearer token, reconnect on transport failure, surfaced via the existing Connection / Watchable contract. Drops ErrURLTransportUnsupported. Tests against a fake mcp-go HTTP server.
+
+---
+
+## Sigstore Fulcio keyless signature verification for plugins
+
+Phase 3/4 plugin signing relies on operator-managed PEM ECDSA public keys (PRAXIS_PLUGIN_TRUSTED_KEYS). Adds keyless verification via Sigstore Fulcio short-lived certs + Rekor transparency log. Operator declares trusted OIDC identities (e.g. cosign sign --identity-token ... or GitHub Actions workload identity) instead of long-lived keys. Verifier checks the cert chain against Fulcio root, looks up the artefact's Rekor entry, and validates the signed identity matches the operator's allowlist. Provides a stronger trust model — compromised long-lived key is no longer a single point of failure. Pulls in github.com/sigstore/sigstore. Falls back to the PEM bundle path when no Fulcio config is set.
+
+---
+
+## mTLS on HTTP API + MCP surface
+
+SECURITY.md lists mTLS as operator-provided (TLS-terminating proxy). Phase 6 brings it in-process: PRAXIS_TLS_CERT_FILE + PRAXIS_TLS_KEY_FILE for server TLS; PRAXIS_MTLS_CLIENT_CA_FILE upgrades to mutual TLS. Same cert/CA shared by the HTTP server and (when mcp-go grows TCP transport) the MCP server. Bearer token continues to gate /v1/* endpoints; mTLS is the orthogonal transport-level guarantee. Documented rotation procedure (zero-downtime via SIGHUP-driven cert reload).
+
+---
+
+## Out-of-process plugin loader as default config flag
+
+Phase 4/5 ship ProcessOpener + cgroup wiring but cmd/praxis bootstrap still wires DefaultOpener (in-process). Add PRAXIS_PLUGIN_OUT_OF_PROCESS=1 (or similar) that switches the loader to ProcessOpener with PRAXIS_PLUGINHOST_BINARY pointing at praxis-pluginhost. When cgroup v2 detected, also sets ProcessOpener.CgroupParent. Documents the choice trade-offs (in-process: lower latency, shared memory; out-of-process: real isolation, kernel-enforced limits).
+
+---
+
+## Persistent capability changelog
+
+Phase 5 changelog endpoint is in-memory: HistoryEntry list rebuilds from zero on every restart. Phase 6 persists it: capability_history table on sqlite + postgres + memory, migration 005, sqlc query family, RegistryHistoryRepo port. /v1/capabilities/{name}/changelog reads from disk so the audit-of-schema-drift survives process restarts and rolling deploys.
+
+---
+
+## Vex.json + security.yml CI gate
+
+SECURITY.md notes the 122 nox findings as triage-pending. Phase 6 closes that loop: per-finding OpenVEX statements in .nox/vex.json justifying each accepted finding, plus a security.yml workflow that diffs new scans against the baseline + vex (mirrors chronos's pipeline). Unbaselined findings fail CI. Operator-facing doc explaining how to add a new vex statement.
+
+---
