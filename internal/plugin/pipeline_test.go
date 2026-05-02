@@ -3,6 +3,7 @@ package plugin_test
 import (
 	"context"
 	"crypto/ecdsa"
+	"crypto/x509"
 	"errors"
 	"os"
 	"path/filepath"
@@ -261,4 +262,105 @@ type registryLoader struct{ reg *capability.Registry }
 
 func (r *registryLoader) Register(reg plugin.Registration) error {
 	return r.reg.Register(reg.Handler)
+}
+
+func TestPipeline_KeylessVerificationDispatch(t *testing.T) {
+	root := t.TempDir()
+	ca := newTestCA(t)
+	leaf, leafKey := ca.issueLeaf(t,
+		"https://github.com/felixgeelhaar/praxis/.github/workflows/release.yml@refs/tags/v1.0.0",
+		"https://token.actions.githubusercontent.com",
+	)
+
+	pluginDir := filepath.Join(root, "pagerduty")
+	if err := os.MkdirAll(pluginDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	manifest := `{"name":"pagerduty","version":"1.0.0","abi":"` + plugin.ABIVersion + `","artifact":"plugin.so"}`
+	if err := os.WriteFile(filepath.Join(pluginDir, "manifest.json"), []byte(manifest), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	_ = writeArtifactWithKeyless(t, pluginDir, []byte("pagerduty bytes"), leaf, leafKey)
+	// writeArtifactWithKeyless used a fixed filename; rename to "plugin.so" used by manifest.
+	if err := os.Rename(filepath.Join(pluginDir, "plugin.so"), filepath.Join(pluginDir, "plugin.so")); err != nil {
+		t.Fatal(err)
+	}
+
+	reg := capability.New()
+	opener := &fakeOpener{plugins: map[string]plugin.Plugin{
+		pluginDir: &fakePlugin{
+			abi:      plugin.ABIVersion,
+			manifest: plugin.Manifest{Name: "pagerduty", Version: "1.0.0"},
+			caps: []plugin.Registration{
+				{Capability: domain.Capability{Name: "pagerduty_create_incident"}, Handler: &fakeHandler{name: "pagerduty_create_incident"}},
+			},
+		},
+	}}
+
+	res, err := plugin.RunPipeline(context.Background(), plugin.PipelineConfig{
+		Dir: root,
+		// TrustedKeys deliberately empty: keyless path must engage on its own.
+		Keyless: &plugin.KeylessVerifier{
+			FulcioRoots: []*x509.Certificate{ca.rootCert},
+			TrustedIdentities: []plugin.Identity{{
+				SubjectGlob: "https://github.com/felixgeelhaar/*",
+				Issuer:      "https://token.actions.githubusercontent.com",
+			}},
+		},
+		Loader: &registryLoader{reg: reg},
+		Opener: opener,
+	})
+	if err != nil {
+		t.Fatalf("RunPipeline: %v", err)
+	}
+	if len(res.Errors) != 0 {
+		t.Fatalf("Errors=%+v", res.Errors)
+	}
+	if len(res.Loaded) != 1 {
+		t.Errorf("Loaded=%+v", res.Loaded)
+	}
+}
+
+func TestPipeline_KeylessIdentityMismatchRejected(t *testing.T) {
+	root := t.TempDir()
+	ca := newTestCA(t)
+	leaf, leafKey := ca.issueLeaf(t,
+		"https://github.com/attacker/evil/.github/workflows/release.yml@refs/tags/v1.0.0",
+		"https://token.actions.githubusercontent.com",
+	)
+
+	pluginDir := filepath.Join(root, "evil")
+	if err := os.MkdirAll(pluginDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	manifest := `{"name":"evil","version":"1.0.0","abi":"` + plugin.ABIVersion + `","artifact":"plugin.so"}`
+	if err := os.WriteFile(filepath.Join(pluginDir, "manifest.json"), []byte(manifest), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	_ = writeArtifactWithKeyless(t, pluginDir, []byte("evil bytes"), leaf, leafKey)
+
+	reg := capability.New()
+	opener := &fakeOpener{plugins: map[string]plugin.Plugin{}}
+
+	res, err := plugin.RunPipeline(context.Background(), plugin.PipelineConfig{
+		Dir: root,
+		Keyless: &plugin.KeylessVerifier{
+			FulcioRoots: []*x509.Certificate{ca.rootCert},
+			TrustedIdentities: []plugin.Identity{{
+				SubjectGlob: "https://github.com/felixgeelhaar/*",
+				Issuer:      "https://token.actions.githubusercontent.com",
+			}},
+		},
+		Loader: &registryLoader{reg: reg},
+		Opener: opener,
+	})
+	if err != nil {
+		t.Fatalf("RunPipeline: %v", err)
+	}
+	if len(res.Loaded) != 0 {
+		t.Errorf("Loaded=%+v want empty", res.Loaded)
+	}
+	if len(res.Errors) != 1 || !errors.Is(res.Errors[0].Err, plugin.ErrIdentityMismatch) {
+		t.Errorf("Errors=%+v want ErrIdentityMismatch", res.Errors)
+	}
 }

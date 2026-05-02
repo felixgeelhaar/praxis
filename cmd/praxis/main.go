@@ -298,6 +298,17 @@ func loadPlugins(ctx context.Context, logger *bolt.Logger, cfg config.Config, re
 	if err != nil {
 		return nil, fmt.Errorf("load trusted plugin keys: %w", err)
 	}
+	keyless, err := buildKeylessVerifier(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("load fulcio trust: %w", err)
+	}
+	if keyless != nil {
+		logger.Info().
+			Int("fulcio_roots", len(keyless.FulcioRoots)).
+			Int("identities", len(keyless.TrustedIdentities)).
+			Str("issuer", cfg.PluginFulcioIssuer).
+			Msg("plugin keyless trust configured")
+	}
 	var opener plugin.Opener = plugin.DefaultOpener{}
 	if cfg.PluginOutOfProcess {
 		// Switch to the out-of-process loader. Each plugin runs in its
@@ -329,6 +340,7 @@ func loadPlugins(ctx context.Context, logger *bolt.Logger, cfg config.Config, re
 	mgr := plugin.NewManager(plugin.ManagerConfig{
 		Dir:         cfg.PluginDir,
 		TrustedKeys: keys,
+		Keyless:     keyless,
 		Loader:      &pluginRegistryLoader{reg: reg},
 		Opener:      opener,
 		Unregister:  reg.Unregister,
@@ -359,6 +371,30 @@ func loadPlugins(ctx context.Context, logger *bolt.Logger, cfg config.Config, re
 		return nil, fmt.Errorf("plugin pipeline: %d plugin(s) failed to load and PRAXIS_PLUGIN_STRICT=1", len(res.Errors))
 	}
 	return mgr, nil
+}
+
+// buildKeylessVerifier assembles a KeylessVerifier from PRAXIS_PLUGIN_FULCIO_*
+// settings. Returns (nil, nil) when no Fulcio roots are configured —
+// the caller treats that as "PEM-key path only".
+func buildKeylessVerifier(cfg config.Config) (*plugin.KeylessVerifier, error) {
+	if len(cfg.PluginFulcioRoots) == 0 {
+		return nil, nil
+	}
+	roots, err := plugin.LoadFulcioRoots(cfg.PluginFulcioRoots)
+	if err != nil {
+		return nil, err
+	}
+	identities := make([]plugin.Identity, 0, len(cfg.PluginFulcioSubjects))
+	for _, sub := range cfg.PluginFulcioSubjects {
+		identities = append(identities, plugin.Identity{
+			SubjectGlob: sub,
+			Issuer:      cfg.PluginFulcioIssuer,
+		})
+	}
+	return &plugin.KeylessVerifier{
+		FulcioRoots:       roots,
+		TrustedIdentities: identities,
+	}, nil
 }
 
 func errString(err error) string {

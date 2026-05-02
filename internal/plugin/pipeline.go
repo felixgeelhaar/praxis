@@ -5,6 +5,7 @@ import (
 	"crypto/ecdsa"
 	"errors"
 	"fmt"
+	"os"
 )
 
 // Opener loads a plugin artefact from disk and returns its exported
@@ -24,8 +25,14 @@ type Opener interface {
 type PipelineConfig struct {
 	Dir         string
 	TrustedKeys []*ecdsa.PublicKey
-	Loader      Loader
-	Opener      Opener
+	// Keyless, when populated with at least one Fulcio root, switches
+	// the pipeline to keyless verification for any plugin that ships a
+	// `<artifact>.cert` file. Plugins that do not ship a certificate
+	// fall back to TrustedKeys (PEM-key path) so the two modes coexist
+	// during a migration.
+	Keyless *KeylessVerifier
+	Loader  Loader
+	Opener  Opener
 	// LoadHooks is forwarded to LoadWithHooks for every plugin loaded
 	// through the pipeline. Optional; nil reduces to the unhookable
 	// Load path.
@@ -155,7 +162,7 @@ func RunPipeline(ctx context.Context, cfg PipelineConfig) (PipelineResult, error
 }
 
 func loadOne(ctx context.Context, cfg PipelineConfig, d Discovered) error {
-	if err := VerifyDiscovered(d, cfg.TrustedKeys); err != nil {
+	if err := verifyArtefact(d, cfg); err != nil {
 		return err
 	}
 	p, err := cfg.Opener.Open(d.Artifact)
@@ -166,4 +173,17 @@ func loadOne(ctx context.Context, cfg PipelineConfig, d Discovered) error {
 		return err
 	}
 	return nil
+}
+
+// verifyArtefact dispatches between keyless (Fulcio cert) and PEM-key
+// verification. A plugin that ships <artifact>.cert is verified
+// against cfg.Keyless; otherwise the legacy TrustedKeys path runs.
+// This keeps a mixed deployment legal during the migration window.
+func verifyArtefact(d Discovered, cfg PipelineConfig) error {
+	if cfg.Keyless != nil && len(cfg.Keyless.FulcioRoots) > 0 {
+		if _, err := os.Stat(d.Artifact + CertificateExtension); err == nil {
+			return VerifyKeyless(d, *cfg.Keyless)
+		}
+	}
+	return VerifyDiscovered(d, cfg.TrustedKeys)
 }

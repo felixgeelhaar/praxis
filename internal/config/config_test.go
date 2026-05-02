@@ -359,6 +359,38 @@ func TestLoad_PluginTrustedKeys_ParsesList(t *testing.T) {
 	}
 }
 
+func TestLoad_PluginFulcioRoots_RequiresSubjects(t *testing.T) {
+	t.Setenv("PRAXIS_PLUGIN_FULCIO_ROOTS", "/etc/praxis/root.pem")
+	t.Setenv("PRAXIS_PLUGIN_FULCIO_ISSUER", "https://token.actions.githubusercontent.com")
+	if _, err := config.Load(); err == nil {
+		t.Errorf("expected error when fulcio roots set without subjects")
+	}
+}
+
+func TestLoad_PluginFulcioRoots_RequiresIssuer(t *testing.T) {
+	t.Setenv("PRAXIS_PLUGIN_FULCIO_ROOTS", "/etc/praxis/root.pem")
+	t.Setenv("PRAXIS_PLUGIN_FULCIO_SUBJECTS", "https://github.com/me/*")
+	if _, err := config.Load(); err == nil {
+		t.Errorf("expected error when fulcio roots set without issuer")
+	}
+}
+
+func TestLoad_PluginFulcioRoots_FullPolicy(t *testing.T) {
+	t.Setenv("PRAXIS_PLUGIN_FULCIO_ROOTS", "/etc/praxis/root.pem")
+	t.Setenv("PRAXIS_PLUGIN_FULCIO_SUBJECTS", "https://github.com/me/*,https://github.com/team/*")
+	t.Setenv("PRAXIS_PLUGIN_FULCIO_ISSUER", "https://token.actions.githubusercontent.com")
+	c, err := config.Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if len(c.PluginFulcioRoots) != 1 || len(c.PluginFulcioSubjects) != 2 {
+		t.Errorf("roots=%v subjects=%v", c.PluginFulcioRoots, c.PluginFulcioSubjects)
+	}
+	if c.PluginFulcioIssuer != "https://token.actions.githubusercontent.com" {
+		t.Errorf("issuer=%q", c.PluginFulcioIssuer)
+	}
+}
+
 func TestLoad_PluginDirOverride(t *testing.T) {
 	t.Setenv("PRAXIS_PLUGIN_DIR", "/opt/praxis/plugins")
 	c, err := config.Load()

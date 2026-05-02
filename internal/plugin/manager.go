@@ -41,6 +41,7 @@ type LoadEvent struct {
 type ManagerConfig struct {
 	Dir         string
 	TrustedKeys []*ecdsa.PublicKey
+	Keyless     *KeylessVerifier
 	Loader      Loader
 	Opener      Opener
 	Unregister  func(capName string)
@@ -100,6 +101,7 @@ func (m *Manager) LoadAll(ctx context.Context) (PipelineResult, error) {
 	res, err := RunPipeline(ctx, PipelineConfig{
 		Dir:         m.cfg.Dir,
 		TrustedKeys: m.cfg.TrustedKeys,
+		Keyless:     m.cfg.Keyless,
 		Loader:      m.cfg.Loader,
 		Opener:      m.cfg.Opener,
 		LoadHooks:   hooks,
@@ -183,6 +185,7 @@ func (m *Manager) ReloadOne(ctx context.Context, name string) error {
 
 	if err := loadOne(ctx, PipelineConfig{
 		TrustedKeys: m.cfg.TrustedKeys,
+		Keyless:     m.cfg.Keyless,
 		Loader:      m.cfg.Loader,
 		Opener:      m.cfg.Opener,
 		LoadHooks:   hooks,

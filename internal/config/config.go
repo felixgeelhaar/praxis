@@ -26,6 +26,9 @@ type Config struct {
 	OutboxPollEvery            time.Duration
 	PluginDir                  string        // PRAXIS_PLUGIN_DIR; empty disables plugin discovery
 	PluginTrustedKeys          []string      // PRAXIS_PLUGIN_TRUSTED_KEYS; PEM ECDSA public keys for cosign-blob verification
+	PluginFulcioRoots          []string      // PRAXIS_PLUGIN_FULCIO_ROOTS; PEM bundles trusted as Fulcio roots
+	PluginFulcioSubjects       []string      // PRAXIS_PLUGIN_FULCIO_SUBJECTS; SAN globs allowed by trust policy
+	PluginFulcioIssuer         string        // PRAXIS_PLUGIN_FULCIO_ISSUER; OIDC issuer required on the cert
 	PluginStrict               bool          // PRAXIS_PLUGIN_STRICT=1; any plugin load error aborts startup
 	PluginAutoreload           bool          // PRAXIS_PLUGIN_AUTORELOAD; default true. fsnotify-driven hot reload.
 	OTLPEndpoint               string        // PRAXIS_OTLP_ENDPOINT; empty disables tracing
@@ -67,6 +70,9 @@ func Load() (Config, error) {
 		OutboxPollEvery:            getDur("PRAXIS_OUTBOX_POLL_EVERY", 2*time.Second),
 		PluginDir:                  os.Getenv("PRAXIS_PLUGIN_DIR"),
 		PluginTrustedKeys:          parseList(os.Getenv("PRAXIS_PLUGIN_TRUSTED_KEYS")),
+		PluginFulcioRoots:          parseList(os.Getenv("PRAXIS_PLUGIN_FULCIO_ROOTS")),
+		PluginFulcioSubjects:       parseList(os.Getenv("PRAXIS_PLUGIN_FULCIO_SUBJECTS")),
+		PluginFulcioIssuer:         os.Getenv("PRAXIS_PLUGIN_FULCIO_ISSUER"),
 		PluginStrict:               parseBool(os.Getenv("PRAXIS_PLUGIN_STRICT")),
 		PluginAutoreload:           parseBoolDefault(os.Getenv("PRAXIS_PLUGIN_AUTORELOAD"), true),
 		AuditRetention:             parseRetention(os.Getenv("PRAXIS_AUDIT_RETENTION")),
@@ -111,6 +117,14 @@ func Load() (Config, error) {
 	}
 	if c.PluginOutOfProcess && c.PluginHostBinary == "" {
 		return c, fmt.Errorf("PRAXIS_PLUGINHOST_BINARY: required when PRAXIS_PLUGIN_OUT_OF_PROCESS=1")
+	}
+	if len(c.PluginFulcioRoots) > 0 {
+		if len(c.PluginFulcioSubjects) == 0 {
+			return c, fmt.Errorf("PRAXIS_PLUGIN_FULCIO_SUBJECTS: required when PRAXIS_PLUGIN_FULCIO_ROOTS is set")
+		}
+		if c.PluginFulcioIssuer == "" {
+			return c, fmt.Errorf("PRAXIS_PLUGIN_FULCIO_ISSUER: required when PRAXIS_PLUGIN_FULCIO_ROOTS is set")
+		}
 	}
 	return c, nil
 }
