@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Praxis — the syscall layer for agents</title>
-  <meta name="description" content="Three verbs, one capability registry, replay-from-audit. The small, audited surface through which an agent reaches the world. MIT, single Go binary.">
-  <meta property="og:title" content="Praxis — the syscall layer for agents">
-  <meta property="og:description" content="Audited tool calls, by default. The model decides; Praxis commits.">
+  <title>Praxis — safe rails for AI actions</title>
+  <meta name="description" content="Stop your AI agent from sending the same email twice. Praxis is the one path your agents take to the outside world: previewable, idempotent, and reconstructible from one audit log.">
+  <meta property="og:title" content="Praxis — safe rails for AI actions">
+  <meta property="og:description" content="Your agent sent that email twice? Praxis would have stopped it.">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -29,27 +29,25 @@
 <main id="main" class="wrap">
 
 <section class="hero">
-  <p class="kicker">For platform engineers running AI agents in production paths.</p>
-  <h1>The model decides. <span class="accent">Praxis commits.</span></h1>
+  <p class="kicker">For teams letting AI agents touch production.</p>
+  <h1>Your agent just sent that email <span class="accent">twice.</span></h1>
   <p class="lede">
-    Praxis is the small, audited surface through which an agent or
-    automation reaches the world. Three verbs:
-    <em>ListCapabilities · Execute · DryRun</em>. Every action named,
-    schema-validated, policy-checked, idempotent, and reconstructible
-    from the audit log. MIT-licensed, single Go binary.
+    Praxis would have stopped it. Praxis is the one path every action
+    your agents take to the outside world — Slack, SMTP, GitHub, your
+    own APIs. Preview before running. Block what your policy
+    disallows. Never fire the same call twice. Replay exactly what
+    happened later.
   </p>
   <div class="cta-row">
     <a class="cta primary" href="#run">Run the demo</a>
     <a class="cta" href="https://github.com/felixgeelhaar/praxis" aria-label="View Praxis on GitHub">★ on GitHub</a>
-    <a class="cta ghost" href="#scenario">See the scenario ↓</a>
+    <a class="cta ghost" href="#scenario">See it work ↓</a>
   </div>
-  <ul class="badges" aria-label="At a glance">
-    <li>MIT licensed</li>
-    <li>Go · single binary</li>
-    <li>CLI · HTTP · MCP</li>
-    <li>SQLite · Postgres · in-memory</li>
-    <li>sigstore-verified plugins</li>
-  </ul>
+  <div class="use-cases">
+    <div><p><strong>Stop double-sends</strong>Same email, same Slack, same Jira ticket — Praxis collapses retries before they fire.</p></div>
+    <div><p><strong>Dry-run anything</strong>Preview your agent's next 10 actions before you let it run them.</p></div>
+    <div><p><strong>One audit, one query</strong>"Show me every action this agent took last quarter" — answered from one log, not five vendor dashboards.</p></div>
+  </div>
 </section>
 
 <section id="scenario" aria-labelledby="scenario-heading">
@@ -119,39 +117,20 @@ $ ./bin/praxis run send_email \
   <div class="vs-table" role="table" aria-label="Comparison with related tools">
     <div class="vs-row vs-head" role="row">
       <span role="columnheader">Tool</span>
-      <span role="columnheader">Solves</span>
-      <span role="columnheader">Praxis's seam</span>
+      <span role="columnheader">What it solves</span>
+      <span role="columnheader">What Praxis adds</span>
     </div>
     <div class="vs-row" role="row">
-      <span role="cell"><strong>Anthropic Computer Use · OpenAI tool-calling</strong></span>
-      <span role="cell">How a model emits an action.</span>
-      <span role="cell">Praxis is where the action is <em>named, validated, gated, and recorded</em>. The model decides; Praxis commits.</span>
+      <span role="cell"><strong>Computer Use · OpenAI tool-calling</strong></span>
+      <span role="cell">Lets the model emit an action.</span>
+      <span role="cell">Names the action, blocks what your policy forbids, dedupes retries, and records what happened — so the model can decide and you can still sleep.</span>
     </div>
     <div class="vs-row" role="row">
-      <span role="cell"><strong>n8n · Zapier</strong></span>
-      <span role="cell">Workflow DAG glue, UI cron.</span>
-      <span role="cell">Praxis is one well-shaped <code>Execute</code> per call with replay-from-audit, idempotency, and policy as first-class verbs — no DAG, no UI.</span>
-    </div>
-    <div class="vs-row" role="row">
-      <span role="cell"><strong>Temporal Activities</strong></span>
-      <span role="cell">Durable workflows.</span>
-      <span role="cell">Temporal makes workflows durable; Praxis makes <em>the act of doing one thing</em> governed and reconstructible. Use Praxis from a Temporal activity, not instead.</span>
-    </div>
-    <div class="vs-row" role="row">
-      <span role="cell"><strong>Raw webhooks · MCP tool servers</strong></span>
-      <span role="cell">Expose endpoints.</span>
-      <span role="cell">Praxis exposes a capability <em>registry</em> with schema, policy, dry-run parity, sigstore-verified plugins, and a permanent audit chain.</span>
+      <span role="cell"><strong>n8n · Zapier · raw webhooks</strong></span>
+      <span role="cell">Workflow glue and trigger routing.</span>
+      <span role="cell">Preview, idempotency, and audit on every single action — not a DAG you have to maintain.</span>
     </div>
   </div>
-
-  <h3 class="subhead">Capability registry, by design</h3>
-  <p>
-    Every capability ships with a JSON Schema for inputs, an output
-    schema, an idempotent flag, a simulatable flag, and a policy
-    profile. <code>DryRun</code> validates against the same schema
-    <code>Execute</code> uses; the two paths can never diverge in
-    practice.
-  </p>
 </section>
 
 <section id="architecture" aria-labelledby="arch-heading">
@@ -187,16 +166,11 @@ $ ./bin/praxis run send_email \
       </div>
     </div>
 
-    <div class="pipe-band accent">
-      <h4>Three verbs only</h4>
-      <p><code>ListCapabilities</code> · <code>Execute</code> · <code>DryRun</code>. The public surface never expands. Everything else is a capability handler behind the registry.</p>
-    </div>
-
     <div class="pipe-band">
       <div class="row">
-        <strong>Storage</strong><span>SQLite (default) · Postgres · in-memory</span>
-        <strong>Auth</strong><span>bearer · JWT · OIDC · OpenTelemetry traces</span>
-        <strong>Plugins</strong><span>Go-plugin host with sigstore verification — out-of-tree handlers without rebuilding the binary</span>
+        <strong>Verbs</strong><span><code>ListCapabilities</code> · <code>Execute</code> · <code>DryRun</code> — the public surface never expands</span>
+        <strong>Storage</strong><span>SQLite (default) · Postgres · in-memory · OpenTelemetry traces</span>
+        <strong>Plugins</strong><span>signed Go plugins — add new actions without rebuilding the binary</span>
       </div>
     </div>
   </div>
