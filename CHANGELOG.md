@@ -6,9 +6,31 @@ Releases are tagged and published via tag-triggered CI; this file is the human-r
 
 ## [Unreleased]
 
-### Planned — Phase 6
+No unreleased changes.
 
-See [docs/backlog.md](docs/backlog.md). Highlights: MCP federation HTTP transport once mcp-go ships it, Sigstore Fulcio keyless plugin verification, in-process mTLS on the HTTP API, out-of-process loader as a config flag, persistent capability changelog, security CI gate via OpenVEX.
+## [0.2.0] — 2026-05-02
+
+Phase 6 closes out: production hardening + supply-chain security.
+
+### Added — Phase 6
+
+- **HTTP API TLS + mTLS**: server-side TLS via `PRAXIS_TLS_CERT_FILE` / `PRAXIS_TLS_KEY_FILE`; mutual TLS via `PRAXIS_MTLS_CLIENT_CA_FILE` (requires TLS). `cmd/praxis/tls.go` `tlsLoader` swaps the active cert via `atomic.Pointer` on SIGHUP so rotation is zero-downtime.
+- **Out-of-process plugin loader as a config flag**: `PRAXIS_PLUGIN_OUT_OF_PROCESS=1` switches the runtime to `ProcessOpener` for kernel-enforced resource limits; in-process `DefaultOpener` remains the default. Requires `PRAXIS_PLUGINHOST_BINARY=/path/to/praxis-pluginhost`.
+- **Persistent capability change history**: `capability_history` table on sqlite + postgres (migration 005); `domain.CapabilityHistoryEntry` + `ports.CapabilityHistoryRepo` + adapters across all three backends. `Registry.SetHistoryRepo` mirrors every breaking-change entry into the repo; `GET /v1/capabilities/{name}/changelog` reads through it so the changelog survives restarts.
+- **Sigstore Fulcio keyless plugin verification**: `internal/plugin.KeylessVerifier` + `LoadFulcioRoots` + identity-bound trust policy `(SubjectGlob, Issuer)`. `PRAXIS_PLUGIN_FULCIO_ROOTS` / `PLUGIN_FULCIO_SUBJECTS` / `PLUGIN_FULCIO_ISSUER` opt operators in. Pipeline dispatches between PEM-key (`<artifact>.sig`) and keyless (`<artifact>.cert`) per plugin so a fleet can migrate one at a time. Stdlib-only; no sigstore-go dependency.
+- **MCP federation HTTP transport**: federation upstreams configured with `url:` now connect via `client.HTTPTransport` from mcp-go v1.10. New `Upstream` fields: `ca_bundle` (PEM bundle pinned for the upstream's TLS cert) and `insecure_skip_verify` (dev only). Token forwarded as `Authorization: Bearer ...`.
+- **Security baseline + CI gate**: `.nox/vex.json` (OpenVEX v0.2.0) carries one statement per firing nox rule with `status` / `justification` / `impact_statement`. `security.yml` runs `nox scan` on every PR + push, uploads SARIF + SBOM, and now hard-fails when a finding category has no VEX statement — accepting a finding is a deliberate commit, not silent drift.
+
+### Changed
+
+- mcp-go bumped from v1.9.0 to v1.10.0.
+- `ErrURLTransportUnsupported` retained as a deprecated sentinel; HTTP federation no longer returns it.
+- `findings.json` snapshot dropped from the repo (nox 0.7.0 has no `--exclude` and recursively scans its own JSON, drowning real signal — see Nox-HQ/nox#38). CI scans regenerate findings each run.
+
+### Fixed
+
+- Lint sweep: `cap` / `max` / `strat` shadowing fixes; HTTP body-close defers tightened; `revive` exported-name rule disabled project-wide for parity with mnemos / chronos.
+- Goreleaser archive-count mismatch (`praxis-pluginhost` only builds linux+darwin); CI golangci-lint bumped to v2.5.0 for Go 1.26 compatibility.
 
 ## [0.1.0] — 2026-05-02
 

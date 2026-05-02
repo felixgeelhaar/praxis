@@ -1,6 +1,6 @@
 {
   "project_id": "Praxis",
-  "version": 100,
+  "version": 102,
   "task_states": {
     "t-action-fsm": {
       "status": "done",
@@ -282,8 +282,14 @@
       "elapsed_minutes": 60
     },
     "t-fed-http-transport": {
-      "status": "pending",
+      "status": "done",
       "path": "",
+      "owner": "ai-agent",
+      "evidence": [
+        "269c5b0"
+      ],
+      "started_at": "2026-05-02T13:29:51.633195+02:00",
+      "completed_at": "2026-05-02T13:29:54.914189+02:00",
       "elapsed_minutes": 0
     },
     "t-fulcio-config": {
@@ -951,5 +957,5 @@
       "elapsed_minutes": 45
     }
   },
-  "updated_at": "2026-05-02T13:03:55.181335+02:00"
+  "updated_at": "2026-05-02T13:29:54.91419+02:00"
 }

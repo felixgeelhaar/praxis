@@ -179,6 +179,62 @@ Status legend: ☐ planned · ◑ in progress · ☑ done
 
 ---
 
+## Phase 4 — Plugin Lifecycle, MCP, and Tenancy
+
+Goal: make plugin operations a first-class runtime concern (not a one-shot startup load) and tighten tenant scoping across CLI + MCP surfaces.
+
+- ☑ Plugin pipeline integrated into `cmd/praxis` startup (`Discover` → `LoadTrustedKeys` → `VerifyDiscovered` → `dlopen` → `plugin.Load`); `PRAXIS_PLUGIN_STRICT=1` aborts startup on any per-plugin error.
+- ☑ Audit retention scheduler (`audit.NewScheduler`) ticking every `PRAXIS_AUDIT_RETENTION_INTERVAL` after `PRAXIS_AUDIT_RETENTION_INITIAL_DELAY`, with `praxis_audit_purge_total{org_id,result}` per-tenant counter.
+- ☑ MCP + CLI tenant-aware capability discovery (`org_id`/`team_id` flow through `list_capabilities`, executor calls, and `praxis caps list/show --org=<id> --team=<id>`).
+- ☑ Out-of-process plugin loader scaffolding (`cmd/praxis-pluginhost` child binary; `internal/plugin/process.go` `ProcessOpener`; line-delimited JSON-RPC IPC; `BudgetedPlugin` enforced by `setrlimit`; crash recovery via `Watchable`).
+- ☑ Plugin lifecycle (fsnotify-driven hot reload toggle via `PRAXIS_PLUGIN_AUTORELOAD`; SIGHUP full re-scan; graceful rollover with in-flight drain via `versionedHandler`; `praxis plugins list / reload <name>` CLI subcommand backed by `GET /v1/plugins` and `POST /v1/plugins/{name}/reload`).
+
+### Phase 4 exit criteria
+
+- Plugin reload (hot or SIGHUP) never drops an in-flight call.
+- A plugin crash never leaves the runtime registry inconsistent with the loaded set.
+- Tenant scoping is consistent across HTTP, MCP, and CLI; cross-tenant reads return `ErrCrossTenantAccess`.
+
+---
+
+## Phase 5 — Observability, Schema Versioning, and Federation
+
+Goal: production-grade observability + capability evolution + multi-server reach.
+
+- ☑ OpenTelemetry tracing (OTLP/gRPC + OTLP/HTTP exporters via `PRAXIS_OTLP_ENDPOINT` / `_PROTOCOL` / `_INSECURE` / `PRAXIS_TRACE_SAMPLE`; `executor.Execute / DryRun / Resume / Revert` open root spans; `handler.<capability>` child spans capture vendor latency; sandbox HTTP client wraps `otelhttp.NewTransport` so outbound calls carry W3C `traceparent`; per-tool spans on the MCP surface).
+- ☑ Capability schema versioning (`InputSchemaVersion` / `OutputSchemaVersion` defaulted `"1"`; migration 004 on sqlite + postgres; `internal/schema.CheckCompat` detects breaking changes; `off` / `warn` / `strict` modes via `PRAXIS_SCHEMA_COMPAT`; `GET /v1/capabilities/{name}/changelog` renders breaking-change history).
+- ☑ Performance benchmarks + regression gate (`make bench` / `make bench-check`; `cmd/benchcheck` + `bench/baseline.txt` fail on >1.20× regressions; `cmd/benchdocs` renders `docs/benchmarks.md`; tag-triggered `bench-publish.yml` opens a snapshot PR per release).
+- ☑ cgroup v2 detection on Linux (`internal/plugin/cgroup`) — kernel-enforced `memory.max` + `cpu.max` via per-plugin cgroups, with `praxis_plugin_memory_peak_bytes` + `praxis_plugin_cpu_seconds_total` surfaced. macOS / non-Linux paths fall through to setrlimit.
+- ☑ Federated MCP (aggregate upstream MCP servers as Praxis capabilities; `mcp.federation.yaml` declares stdio-transport upstreams with optional `Token` + `Allow`; tools register under `<upstream>__<tool>`; `Supervisor` reconnect with exponential backoff; `praxis_mcp_federation_status{upstream,status}` gauge).
+
+### Phase 5 exit criteria
+
+- Distributed traces stitch executor → handler → outbound vendor across Praxis + Mnemos.
+- A breaking schema change is rejected before the new capability replaces the old one in strict mode.
+- Bench-check catches a >20% regression in CI before it reaches main.
+
+---
+
+## Phase 6 — Production Hardening + Supply-Chain Security
+
+Goal: lock down the trust boundaries (HTTP API, plugin loading, MCP federation) and make the security baseline auditable, not advisory.
+
+- ☑ HTTP API TLS + mTLS (`PRAXIS_TLS_CERT_FILE` / `PRAXIS_TLS_KEY_FILE`; `PRAXIS_MTLS_CLIENT_CA_FILE` requires TLS); `tlsLoader` swaps the active cert via `atomic.Pointer` on SIGHUP for zero-downtime rotation.
+- ☑ cgroup v2 spawn (per-plugin cgroup created before fork/exec, child PID attached after `Start`, directory reclaimed on kill).
+- ☑ Out-of-process plugin loader as a config flag (`PRAXIS_PLUGIN_OUT_OF_PROCESS=1` + `PRAXIS_PLUGINHOST_BINARY`); in-process `DefaultOpener` remains the default.
+- ☑ Persistent capability change history (`capability_history` migration 005 on sqlite + postgres; `domain.CapabilityHistoryEntry` + `ports.CapabilityHistoryRepo` + adapters across all three backends; `Registry.SetHistoryRepo` mirrors every breaking-change entry; changelog endpoint reads through the repo).
+- ☑ Sigstore Fulcio keyless plugin verification (`internal/plugin.KeylessVerifier` with identity-bound `(SubjectGlob, Issuer)` policy; `PRAXIS_PLUGIN_FULCIO_ROOTS` / `_SUBJECTS` / `_ISSUER`; pipeline dispatches between PEM-key and keyless per plugin; stdlib-only).
+- ☑ MCP federation HTTP transport (mcp-go v1.10.0 `client.HTTPTransport`; `Upstream.ca_bundle` pins the trust store, `insecure_skip_verify` for dev, `token` forwarded as Bearer).
+- ☑ Security baseline + CI gate (`.nox/vex.json` carries one OpenVEX statement per firing rule; `security.yml` hard-fails on unbaselined finding categories; SARIF + SBOM uploaded unconditionally).
+
+### Phase 6 exit criteria
+
+- HTTP API speaks TLS / mTLS in every production deployment; cert rotation is operational, not a redeploy.
+- Plugin loading verifies signatures against either an operator's PEM bundle or a Fulcio identity policy, never an empty trust store.
+- Every nox finding category is either fixed or carries a VEX statement with status + justification + impact, enforced at PR time.
+
+---
+
 ## Cross-cutting (every phase)
 
 - **Schema discipline:** every capability has a versioned input/output schema.
