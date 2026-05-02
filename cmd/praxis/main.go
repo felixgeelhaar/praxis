@@ -164,8 +164,14 @@ func bootstrap(ctx context.Context) (*runtime, func(), error) {
 	if repos.CapabilityHistory != nil {
 		registry.SetHistoryRepo(repos.CapabilityHistory)
 	}
+	if repos.Capability != nil {
+		// Persist every Register call so the FK on `actions.capability`
+		// is satisfied without out-of-band seeding on cold-start
+		// postgres deployments.
+		registry.SetRepo(repos.Capability)
+	}
 	configureCompat(registry, cfg)
-	registerHandlers(registry)
+	registerHandlers(registry, logger)
 
 	// Phase 5 cgroup v2 detection. Logs the outcome at startup so
 	// operators see the fallback reason without grepping for absent
@@ -425,23 +431,35 @@ func errString(err error) string {
 	return err.Error()
 }
 
-func registerHandlers(reg *capability.Registry) {
-	_ = reg.Register(slackhandler.New(os.Getenv("SLACK_TOKEN")))
-	_ = reg.Register(emailhandler.New(emailhandler.Config{
-		Host:     os.Getenv("SMTP_HOST"),
-		Port:     defaultEnv("SMTP_PORT", "587"),
-		Username: os.Getenv("SMTP_USERNAME"),
-		Password: os.Getenv("SMTP_PASSWORD"),
-		From:     os.Getenv("SMTP_FROM"),
-	}))
-	_ = reg.Register(httphandler.New(httphandler.Config{}))
-	ghCfg := githubhandler.Config{Token: os.Getenv("GITHUB_TOKEN")}
-	_ = reg.Register(githubhandler.NewCreateIssue(ghCfg))
-	_ = reg.Register(githubhandler.NewAddComment(ghCfg))
-	linCfg := linearhandler.Config{Token: os.Getenv("LINEAR_TOKEN")}
-	_ = reg.Register(linearhandler.NewCreateIssue(linCfg))
-	_ = reg.Register(linearhandler.NewTransitionStatus(linCfg))
-	_ = reg.Register(calendarhandler.New(defaultEnv("PRAXIS_PRODUCT_DOMAIN", "praxis.local")))
+func registerHandlers(reg *capability.Registry, logger *bolt.Logger) {
+	handlers := []capability.Handler{
+		slackhandler.New(os.Getenv("SLACK_TOKEN")),
+		emailhandler.New(emailhandler.Config{
+			Host:     os.Getenv("SMTP_HOST"),
+			Port:     defaultEnv("SMTP_PORT", "587"),
+			Username: os.Getenv("SMTP_USERNAME"),
+			Password: os.Getenv("SMTP_PASSWORD"),
+			From:     os.Getenv("SMTP_FROM"),
+		}),
+		httphandler.New(httphandler.Config{}),
+		githubhandler.NewCreateIssue(githubhandler.Config{Token: os.Getenv("GITHUB_TOKEN")}),
+		githubhandler.NewAddComment(githubhandler.Config{Token: os.Getenv("GITHUB_TOKEN")}),
+		linearhandler.NewCreateIssue(linearhandler.Config{Token: os.Getenv("LINEAR_TOKEN")}),
+		linearhandler.NewTransitionStatus(linearhandler.Config{Token: os.Getenv("LINEAR_TOKEN")}),
+		calendarhandler.New(defaultEnv("PRAXIS_PRODUCT_DOMAIN", "praxis.local")),
+	}
+	for _, h := range handlers {
+		if err := reg.Register(h); err != nil {
+			// Surface persistence failures: a silently-swallowed Register
+			// leaves the action FK to capabilities unsatisfiable later,
+			// turning every Execute into an opaque 500.
+			if logger != nil {
+				logger.Error().Str("capability", h.Name()).Err(err).Msg("register handler failed")
+			} else {
+				fmt.Fprintf(os.Stderr, "register %s: %v\n", h.Name(), err)
+			}
+		}
+	}
 }
 
 func defaultEnv(k, def string) string {

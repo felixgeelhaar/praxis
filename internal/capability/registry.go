@@ -111,6 +111,7 @@ type Registry struct {
 	onBreak       func(capName string, issues []CompatIssue)
 	history       map[string][]HistoryEntry
 	historyRepo   ports.CapabilityHistoryRepo
+	repo          ports.CapabilityRepo
 	clock         func() time.Time
 }
 
@@ -121,6 +122,20 @@ func (r *Registry) SetHistoryRepo(repo ports.CapabilityHistoryRepo) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.historyRepo = repo
+}
+
+// SetRepo wires a persistent backend for the capability descriptors
+// themselves. When set, every successful Register call upserts the
+// capability into the repo so the FK on `actions.capability` is
+// satisfied without requiring out-of-band seeding.
+//
+// In-memory deployments leave this nil; nothing relies on the repo
+// being present for routing. SQL-backed deployments must call this
+// during boot, before any handler registers.
+func (r *Registry) SetRepo(repo ports.CapabilityRepo) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.repo = repo
 }
 
 func New() *Registry {
@@ -239,6 +254,16 @@ func (r *Registry) Register(h Handler) error {
 	}
 	r.handlers[h.Name()] = h
 	r.capabilities[h.Name()] = desc
+	if r.repo != nil {
+		// Upsert under a fresh background context so registration on
+		// startup isn't tied to whatever caller context invoked
+		// Register. The capability table's FK from `actions.capability`
+		// would otherwise reject every execute on cold-start postgres
+		// deployments.
+		if err := r.repo.Upsert(context.Background(), desc); err != nil {
+			return fmt.Errorf("persist capability %q: %w", h.Name(), err)
+		}
+	}
 	return nil
 }
 

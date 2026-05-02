@@ -2,6 +2,7 @@ package capability_test
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"testing"
 
@@ -396,3 +397,64 @@ func (r *fakeHistoryRepo) count(name string) int {
 	defer r.mu.Unlock()
 	return len(r.entries[name])
 }
+
+type fakeCapRepo struct {
+	mu sync.Mutex
+	upserted []domain.Capability
+}
+
+func (r *fakeCapRepo) Upsert(_ context.Context, c domain.Capability) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.upserted = append(r.upserted, c)
+	return nil
+}
+func (r *fakeCapRepo) Get(_ context.Context, name string) (domain.Capability, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for _, c := range r.upserted {
+		if c.Name == name {
+			return c, nil
+		}
+	}
+	return domain.Capability{}, errors.New("not found")
+}
+func (r *fakeCapRepo) List(_ context.Context) ([]domain.Capability, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	out := append([]domain.Capability(nil), r.upserted...)
+	return out, nil
+}
+
+func TestRegistry_PersistsToRepoOnRegister(t *testing.T) {
+	repo := &fakeCapRepo{}
+	reg := capability.New()
+	reg.SetRepo(repo)
+	if err := reg.Register(&mockHandler{name: "demo_cap", output: map[string]any{}}); err != nil {
+		t.Fatalf("register: %v", err)
+	}
+	if len(repo.upserted) != 1 || repo.upserted[0].Name != "demo_cap" {
+		t.Fatalf("upsert state: %+v", repo.upserted)
+	}
+}
+
+func TestRegistry_PropagatesRepoUpsertError(t *testing.T) {
+	reg := capability.New()
+	reg.SetRepo(&erroringCapRepo{})
+	if err := reg.Register(&mockHandler{name: "demo_cap", output: map[string]any{}}); err == nil {
+		t.Fatal("want error from repo upsert")
+	}
+}
+
+type erroringCapRepo struct{}
+
+func (erroringCapRepo) Upsert(context.Context, domain.Capability) error {
+	return errors.New("upsert failed")
+}
+func (erroringCapRepo) Get(context.Context, string) (domain.Capability, error) {
+	return domain.Capability{}, errors.New("not impl")
+}
+func (erroringCapRepo) List(context.Context) ([]domain.Capability, error) {
+	return nil, nil
+}
+

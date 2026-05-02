@@ -188,6 +188,14 @@ func tsValPtr(t pgtype.Timestamptz) *time.Time {
 type capabilityAdapter struct{ q *sqlcgen.Queries }
 
 func (a *capabilityAdapter) Upsert(ctx context.Context, c domain.Capability) error {
+	// `permissions` column is `text[] not null default '{}'`; pgx
+	// serialises a nil []string as NULL, which trips the not-null
+	// constraint. Normalise to an empty slice so the schema's default
+	// and the runtime contract agree.
+	perms := c.Permissions
+	if perms == nil {
+		perms = []string{}
+	}
 	return a.q.UpsertCapability(ctx, sqlcgen.UpsertCapabilityParams{
 		Name:                c.Name,
 		Description:         textNull(c.Description),
@@ -195,7 +203,7 @@ func (a *capabilityAdapter) Upsert(ctx context.Context, c domain.Capability) err
 		InputSchemaVersion:  defaultStr(c.InputSchemaVersion, "1"),
 		OutputSchema:        mustJSONBytes(c.OutputSchema),
 		OutputSchemaVersion: defaultStr(c.OutputSchemaVersion, "1"),
-		Permissions:         c.Permissions,
+		Permissions:         perms,
 		Simulatable:         c.Simulatable,
 		Idempotent:          c.Idempotent,
 		RegisteredAt:        ts(time.Now()),
