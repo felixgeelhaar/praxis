@@ -71,6 +71,27 @@ func Open(_ context.Context, logger *bolt.Logger, conn string) (*ports.Repos, er
 }
 
 func runMigrations(db *sql.DB) error {
+	if _, err := db.Exec(`CREATE TABLE IF NOT EXISTS schema_migrations (
+		name TEXT PRIMARY KEY,
+		applied_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+	)`); err != nil {
+		return fmt.Errorf("create schema_migrations: %w", err)
+	}
+	rows, err := db.Query(`SELECT name FROM schema_migrations`)
+	if err != nil {
+		return fmt.Errorf("list applied: %w", err)
+	}
+	applied := map[string]bool{}
+	for rows.Next() {
+		var n string
+		if err := rows.Scan(&n); err != nil {
+			rows.Close()
+			return err
+		}
+		applied[n] = true
+	}
+	rows.Close()
+
 	entries, err := migrationsFS.ReadDir("migrations")
 	if err != nil {
 		return err
@@ -83,12 +104,18 @@ func runMigrations(db *sql.DB) error {
 	}
 	sort.Strings(names)
 	for _, n := range names {
+		if applied[n] {
+			continue
+		}
 		body, err := migrationsFS.ReadFile("migrations/" + n)
 		if err != nil {
 			return err
 		}
 		if _, err := db.Exec(string(body)); err != nil {
 			return fmt.Errorf("apply %s: %w", n, err)
+		}
+		if _, err := db.Exec(`INSERT INTO schema_migrations (name) VALUES (?)`, n); err != nil {
+			return fmt.Errorf("record %s: %w", n, err)
 		}
 	}
 	return nil

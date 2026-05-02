@@ -68,6 +68,27 @@ func Open(ctx context.Context, logger *bolt.Logger, conn string) (*ports.Repos, 
 }
 
 func runMigrations(ctx context.Context, pool *pgxpool.Pool) error {
+	if _, err := pool.Exec(ctx, `CREATE TABLE IF NOT EXISTS schema_migrations (
+		name TEXT PRIMARY KEY,
+		applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+	)`); err != nil {
+		return fmt.Errorf("create schema_migrations: %w", err)
+	}
+	rows, err := pool.Query(ctx, `SELECT name FROM schema_migrations`)
+	if err != nil {
+		return fmt.Errorf("list applied: %w", err)
+	}
+	applied := map[string]bool{}
+	for rows.Next() {
+		var n string
+		if err := rows.Scan(&n); err != nil {
+			rows.Close()
+			return err
+		}
+		applied[n] = true
+	}
+	rows.Close()
+
 	entries, err := migrationsFS.ReadDir("migrations")
 	if err != nil {
 		return err
@@ -80,12 +101,18 @@ func runMigrations(ctx context.Context, pool *pgxpool.Pool) error {
 	}
 	sort.Strings(names)
 	for _, n := range names {
+		if applied[n] {
+			continue
+		}
 		body, err := migrationsFS.ReadFile("migrations/" + n)
 		if err != nil {
 			return err
 		}
 		if _, err := pool.Exec(ctx, string(body)); err != nil {
 			return fmt.Errorf("apply %s: %w", n, err)
+		}
+		if _, err := pool.Exec(ctx, `INSERT INTO schema_migrations (name) VALUES ($1)`, n); err != nil {
+			return fmt.Errorf("record %s: %w", n, err)
 		}
 	}
 	return nil
