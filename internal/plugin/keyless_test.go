@@ -297,6 +297,31 @@ func TestLoadFulcioRoots_RoundTrip(t *testing.T) {
 	}
 }
 
+func TestVerifyKeyless_AcceptsBase64Cert(t *testing.T) {
+	ca := newTestCA(t)
+	leaf, leafKey := ca.issueLeaf(t,
+		"https://github.com/felixgeelhaar/praxis/.github/workflows/release.yml@refs/tags/v1.0.0",
+		"https://token.actions.githubusercontent.com",
+	)
+	dir := t.TempDir()
+	artifact := writeArtifactWithKeyless(t, dir, []byte("payload"), leaf, leafKey)
+	// Replace the PEM cert with a base64-only DER (cosign 2.x format).
+	if err := os.WriteFile(artifact+plugin.CertificateExtension,
+		[]byte(base64.StdEncoding.EncodeToString(leaf.Raw)), 0o600); err != nil {
+		t.Fatalf("rewrite cert: %v", err)
+	}
+	v := plugin.KeylessVerifier{
+		FulcioRoots: []*x509.Certificate{ca.rootCert},
+		TrustedIdentities: []plugin.Identity{{
+			SubjectGlob: "https://github.com/felixgeelhaar/*",
+			Issuer:      "https://token.actions.githubusercontent.com",
+		}},
+	}
+	if err := plugin.VerifyKeyless(plugin.Discovered{Artifact: artifact}, v); err != nil {
+		t.Errorf("VerifyKeyless on base64-DER cert: %v", err)
+	}
+}
+
 func TestLoadFulcioRoots_BadPath(t *testing.T) {
 	_, err := plugin.LoadFulcioRoots([]string{"/nonexistent/root.pem"})
 	if err == nil {

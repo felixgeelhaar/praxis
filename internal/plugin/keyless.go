@@ -1,9 +1,11 @@
 package plugin
 
 import (
+	"bytes"
 	"crypto/ecdsa"
 	"crypto/x509"
 	"encoding/asn1"
+	"encoding/base64"
 	"encoding/pem"
 	"errors"
 	"fmt"
@@ -163,15 +165,39 @@ func loadLeafCertificate(artifact string) (*x509.Certificate, error) {
 		}
 		return nil, fmt.Errorf("read certificate: %w", err)
 	}
-	block, _ := pem.Decode(raw)
-	if block == nil || block.Type != "CERTIFICATE" {
-		return nil, fmt.Errorf("%w: not a PEM CERTIFICATE", ErrCertificateUntrusted)
+	if cert, perr := parsePEMCertificate(raw); perr == nil {
+		return cert, nil
 	}
-	cert, err := x509.ParseCertificate(block.Bytes)
+	// cosign sign-blob's --output-certificate output is base64-
+	// encoded raw DER on some 2.x builds (no PEM headers). Try that
+	// before giving up.
+	if cert, derr := parseBase64Certificate(raw); derr == nil {
+		return cert, nil
+	}
+	return nil, fmt.Errorf("%w: certificate is neither PEM nor base64-encoded DER", ErrCertificateUntrusted)
+}
+
+func parsePEMCertificate(raw []byte) (*x509.Certificate, error) {
+	rest := raw
+	for {
+		var block *pem.Block
+		block, rest = pem.Decode(rest)
+		if block == nil {
+			return nil, errors.New("no PEM CERTIFICATE block")
+		}
+		if block.Type == "CERTIFICATE" {
+			return x509.ParseCertificate(block.Bytes)
+		}
+	}
+}
+
+func parseBase64Certificate(raw []byte) (*x509.Certificate, error) {
+	trimmed := bytes.TrimSpace(raw)
+	der, err := base64.StdEncoding.DecodeString(string(trimmed))
 	if err != nil {
-		return nil, fmt.Errorf("parse leaf certificate: %w", err)
+		return nil, err
 	}
-	return cert, nil
+	return x509.ParseCertificate(der)
 }
 
 func chainToFulcio(leaf *x509.Certificate, intermediates, roots []*x509.Certificate, now time.Time) error {
