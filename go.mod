@@ -6,19 +6,19 @@ require (
 	github.com/felixgeelhaar/bolt v1.3.0
 	github.com/felixgeelhaar/fortify v1.2.1
 	github.com/felixgeelhaar/mcp-go v1.10.0
-	github.com/felixgeelhaar/statekit v0.8.0
-	github.com/fsnotify/fsnotify v1.7.0
+	github.com/felixgeelhaar/statekit v1.3.2
+	github.com/fsnotify/fsnotify v1.10.0
 	github.com/jackc/pgx/v5 v5.9.2
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2
 	github.com/slack-go/slack v0.23.0
-	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.56.0
+	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.68.0
 	go.opentelemetry.io/otel v1.43.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.43.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.43.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.43.0
 	go.opentelemetry.io/otel/sdk v1.43.0
 	go.opentelemetry.io/otel/trace v1.43.0
-	golang.org/x/text v0.35.0
+	golang.org/x/text v0.36.0
 	gopkg.in/yaml.v3 v3.0.1
 	modernc.org/sqlite v1.50.0
 )
