@@ -1,6 +1,6 @@
 {
   "project_id": "Praxis",
-  "version": 95,
+  "version": 97,
   "task_states": {
     "t-action-fsm": {
       "status": "done",
@@ -287,11 +287,15 @@
       "elapsed_minutes": 0
     },
     "t-fulcio-config": {
-      "status": "in_progress",
+      "status": "done",
       "path": "",
       "owner": "ai-agent",
+      "evidence": [
+        "e8d94a3"
+      ],
       "started_at": "2026-05-02T12:05:00.301781+02:00",
-      "elapsed_minutes": 0
+      "completed_at": "2026-05-02T12:17:31.673039+02:00",
+      "elapsed_minutes": 12
     },
     "t-fulcio-verifier": {
       "status": "done",
@@ -930,10 +934,12 @@
       "elapsed_minutes": 90
     },
     "t-vex-bootstrap": {
-      "status": "pending",
+      "status": "in_progress",
       "path": "",
+      "owner": "ai-agent",
+      "started_at": "2026-05-02T12:17:39.462095+02:00",
       "elapsed_minutes": 0
     }
   },
-  "updated_at": "2026-05-02T12:05:00.301781+02:00"
+  "updated_at": "2026-05-02T12:17:39.462095+02:00"
 }

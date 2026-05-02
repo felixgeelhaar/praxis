@@ -3,8 +3,8 @@
   "@id": "https://github.com/felixgeelhaar/praxis/.nox/vex.json",
   "author": "Felix Geelhaar",
   "role": "maintainer",
-  "timestamp": "2026-05-02T08:00:00Z",
-  "version": 1,
+  "timestamp": "2026-05-02T10:00:00Z",
+  "version": 2,
   "statements": [
     {
       "vulnerability": {
@@ -180,6 +180,17 @@
       "status": "not_affected",
       "justification": "inline_mitigations_already_exist",
       "impact_statement": "Hits docker-compose.yml example bindings (typically 127.0.0.1 / 0.0.0.0 / loopback ranges). Local-development examples; not deployment configuration."
+    },
+    {
+      "vulnerability": {
+        "@id": "AI-038",
+        "name": "AI-038",
+        "description": "Embedding API key stored with vectors"
+      },
+      "products": [{"@id": "pkg:golang/github.com/felixgeelhaar/praxis"}],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_present",
+      "impact_statement": "Both hits land in .claude/settings.local.json — Claude Code agent state for the maintainer's local IDE. The matched substrings are agent permission hashes / project IDs, not API key material. The file is gitignored at the parent dotfiles level; nox 0.7.0 does not yet honour .gitignore (Nox-HQ/nox#38) so it surfaces here. Sister case to DATA-001 in the same file."
     }
   ]
 }

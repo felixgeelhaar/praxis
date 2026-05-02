@@ -73,7 +73,9 @@
       "Bash(git rm *)",
       "Bash(git restore *)",
       "Bash(gh release *)",
-      "mcp__roady__roady_get_state"
+      "mcp__roady__roady_get_state",
+      "mcp__nox__list_findings",
+      "Bash(python3 -c \"import json; d=json.load\\(open\\('.nox/vex.json'\\)\\); print\\('statements:', len\\(d['statements']\\)\\); print\\('rules:', sorted\\(s['vulnerability']['@id'] for s in d['statements']\\)\\)\")"
     ]
   }
 }

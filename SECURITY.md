@@ -96,17 +96,18 @@ Categories currently waived:
 
 | Rule | Count | Notes |
 |---|---:|---|
-| `SEC-545` (PagerDuty key heuristic) | 28 | False positives matching `pagerduty_create_incident` test plugin name. |
-| `SEC-163` (high-entropy hex) | 25 | Build-metadata strings + go.sum hashes. |
+| `SEC-163` (high-entropy hex) | 50 | Build-metadata strings + go.sum hashes. |
+| `SEC-545` (PagerDuty key heuristic) | 34 | False positives matching `pagerduty_create_incident` test plugin name. |
 | `DATA-001` (email in code) | 21 | Test fixture contact addresses + `.claude/settings.local.json`. |
-| `IAC-013` (action pinned to tag, not SHA) | 14 | Same trade-off mnemos / chronos accept. |
-| `SEC-161` (high-entropy assignment) | 10 | Test seed values. |
-| `SEC-430` / `SEC-073` / `IAC-254` / `IAC-351` | 9 | postgres test DB creds in CI workflow (ephemeral, not production). |
+| `IAC-013` (action pinned to tag, not SHA) | 17 | Same trade-off mnemos / chronos accept. |
+| `SEC-161` (high-entropy assignment) | 16 | Test seed values. |
+| `SEC-162` / `DATA-005` | 8 | Roady metadata + docker-compose example IP. |
+| `SEC-430` / `SEC-073` / `IAC-254` / `IAC-351` | 11 | postgres test DB creds in CI workflow (ephemeral, not production). |
 | `IAC-314` / `IAC-315` (workflow write perms) | 3 | release.yml + bench-publish.yml legitimately need write perms. |
-| `CONT-001` (base image not pinned to digest) | 2 | Pin before production deploy. |
+| `CONT-001` (base image not pinned to digest) | 3 | Pin before production deploy. |
+| `AI-038` (embedding key with vectors) | 2 | False positive matching `.claude/settings.local.json` agent state. |
 | `SEC-437` (Slack token heuristic) | 1 | False positive matching example text in README. |
-| `SEC-629` (LOB API key heuristic) | 1 | False positive matching test fixture. |
-| `SEC-162` / `DATA-005` | 4 | Roady metadata + docker-compose example IP. |
+| `SEC-629` (LOB API key heuristic) | 2 | False positive matching test fixture. |
 
 Refresh locally:
 
