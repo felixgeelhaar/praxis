@@ -28,6 +28,8 @@ Production deployments must:
 |---|---|---|---|
 | HTTP `/v1/*` | Bearer token | `PRAXIS_API_TOKEN` | open if unset (local dev only) |
 | HTTP `/healthz` + `/metrics` | none | – | open |
+| HTTP transport (TLS) | server cert | `PRAXIS_TLS_CERT_FILE` + `PRAXIS_TLS_KEY_FILE` | plain HTTP if unset |
+| HTTP transport (mTLS) | client cert verified against CA bundle | `PRAXIS_MTLS_CLIENT_CA_FILE` (requires TLS) | server-only TLS if unset |
 | MCP (stdio) | none | – | – |
 | Plugin loading | cosign-blob signature verification | `PRAXIS_PLUGIN_TRUSTED_KEYS` | refuses every plugin if unset |
 | Federation push (per upstream) | bearer token forwarded to upstream | upstream `token` field in `mcp.federation.yaml` | unauthenticated if unset |
@@ -117,7 +119,7 @@ Each rule category is waived in `.nox/vex.json` (OpenVEX v0.2.0) with explicit `
 
 ## Known gaps
 
-- mTLS between Praxis and its consumers is operator-provided (TLS-terminating proxy or service mesh).
+- mTLS for the MCP surface is operator-provided (mcp-go ships only stdio today; in-process TLS lands once the upstream adds a TCP transport). HTTP API mTLS is in-process via `PRAXIS_TLS_CERT_FILE` / `PRAXIS_TLS_KEY_FILE` / `PRAXIS_MTLS_CLIENT_CA_FILE` (Phase 6).
 - The in-process sandbox cannot enforce `MaxMemoryBytes`; the field is reserved and enforced only on the cgroup v2 path.
 - Federation upstream URL transport is not implemented yet (mcp-go v1.9 ships only stdio); URL upstreams in the federation config fail with `ErrURLTransportUnsupported`.
 - Plugin signatures rely on operator-managed key bundles. Sigstore Fulcio / Rekor integration for keyless verification is on the roadmap.

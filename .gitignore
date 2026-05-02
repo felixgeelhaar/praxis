@@ -38,4 +38,8 @@ bench/current.txt
 # nox scan artefacts. findings.json (at repo root) IS committed (the
 # security baseline); other formats regenerate on every scan.
 .nox/out/
-praxis
+
+# Built praxis binary at repo root (artefact of `make build` /
+# `goreleaser`). Anchored to the root so cmd/praxis/ source dir is
+# not matched.
+/praxis

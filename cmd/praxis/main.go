@@ -204,6 +204,27 @@ func bootstrap(ctx context.Context) (*runtime, func(), error) {
 	}, cleanup, nil
 }
 
+// runSighupTLSReload listens for SIGHUP and reloads the server
+// certificate from disk. Lets operators rotate certs without
+// dropping in-flight connections — the atomic Cert pointer swaps
+// for new TLS handshakes only. Phase 6 mTLS.
+func runSighupTLSReload(ctx context.Context, logger *bolt.Logger, loader *tlsLoader) {
+	ch := make(chan os.Signal, 1)
+	signal.Notify(ch, syscall.SIGHUP)
+	defer signal.Stop(ch)
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ch:
+			logger.Info().Msg("SIGHUP received; reloading TLS keypair")
+			if err := loader.Reload(); err != nil {
+				logger.Error().Err(err).Msg("TLS reload failed; previous cert still active")
+			}
+		}
+	}
+}
+
 // runSighupReload listens for SIGHUP and re-runs the plugin pipeline
 // when it arrives. Returns when ctx is cancelled. Phase 4: pairs with
 // the fsnotify watcher for deployments where file events aren't
@@ -437,11 +458,39 @@ func runServe() int {
 		WriteTimeout:      30 * time.Second,
 		IdleTimeout:       2 * time.Minute,
 	}
-	rt.logger.Info().Str("addr", addr).Msg("praxis server listening")
+
+	var tlsLoader *tlsLoader
+	if rt.cfg.TLSCertFile != "" {
+		var err error
+		tlsLoader, err = newTLSLoader(rt.cfg.TLSCertFile, rt.cfg.TLSKeyFile, rt.cfg.MTLSClientCAFile)
+		if err != nil {
+			rt.logger.Error().Err(err).Msg("TLS init failed")
+			return 1
+		}
+		cfg, err := tlsLoader.TLSConfig()
+		if err != nil {
+			rt.logger.Error().Err(err).Msg("TLS config failed")
+			return 1
+		}
+		srv.TLSConfig = cfg
+		go runSighupTLSReload(ctx, rt.logger, tlsLoader)
+	}
+
+	rt.logger.Info().Str("addr", addr).Bool("tls", tlsLoader != nil).Bool("mtls", rt.cfg.MTLSClientCAFile != "").Msg("praxis server listening")
 
 	errCh := make(chan error, 1)
 	go func() {
-		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		var err error
+		if tlsLoader != nil {
+			// ListenAndServeTLS reads files at start; cert/key paths
+			// passed empty so it uses TLSConfig.GetCertificate (the
+			// dynamic loader). See net/http source: empty strings
+			// fall back to TLSConfig.Certificates / GetCertificate.
+			err = srv.ListenAndServeTLS("", "")
+		} else {
+			err = srv.ListenAndServe()
+		}
+		if err != nil && !errors.Is(err, http.ErrServerClosed) {
 			errCh <- err
 		}
 	}()

@@ -34,6 +34,9 @@ type Config struct {
 	TraceSample                float64       // PRAXIS_TRACE_SAMPLE; 0..1 sampling probability, default 1.0
 	SchemaCompat               string        // PRAXIS_SCHEMA_COMPAT; off (default) | warn | strict
 	MCPFederationConfigPath    string        // PRAXIS_MCP_FEDERATION_CONFIG; empty disables federation
+	TLSCertFile                string        // PRAXIS_TLS_CERT_FILE; PEM-encoded cert chain. Empty disables TLS.
+	TLSKeyFile                 string        // PRAXIS_TLS_KEY_FILE; PEM-encoded private key. Required when TLSCertFile set.
+	MTLSClientCAFile           string        // PRAXIS_MTLS_CLIENT_CA_FILE; PEM CA bundle. When set, requires + verifies client certs.
 	AuditRetentionInterval     time.Duration // PRAXIS_AUDIT_RETENTION_INTERVAL; cadence between sweeps
 	AuditRetentionInitialDelay time.Duration // PRAXIS_AUDIT_RETENTION_INITIAL_DELAY; defer first sweep
 	// AuditRetention maps OrgID to retention window. The empty key is the
@@ -73,6 +76,9 @@ func Load() (Config, error) {
 		TraceSample:                getFloat("PRAXIS_TRACE_SAMPLE", 1.0),
 		SchemaCompat:               strings.ToLower(getEnv("PRAXIS_SCHEMA_COMPAT", "off")),
 		MCPFederationConfigPath:    os.Getenv("PRAXIS_MCP_FEDERATION_CONFIG"),
+		TLSCertFile:                os.Getenv("PRAXIS_TLS_CERT_FILE"),
+		TLSKeyFile:                 os.Getenv("PRAXIS_TLS_KEY_FILE"),
+		MTLSClientCAFile:           os.Getenv("PRAXIS_MTLS_CLIENT_CA_FILE"),
 	}
 
 	switch c.DBType {
@@ -89,6 +95,15 @@ func Load() (Config, error) {
 	case "allow", "deny", "rules":
 	default:
 		return c, fmt.Errorf("PRAXIS_POLICY_MODE: unknown mode %q (allow|deny|rules)", c.PolicyMode)
+	}
+	if c.TLSCertFile != "" && c.TLSKeyFile == "" {
+		return c, fmt.Errorf("PRAXIS_TLS_KEY_FILE: required when PRAXIS_TLS_CERT_FILE is set")
+	}
+	if c.TLSKeyFile != "" && c.TLSCertFile == "" {
+		return c, fmt.Errorf("PRAXIS_TLS_CERT_FILE: required when PRAXIS_TLS_KEY_FILE is set")
+	}
+	if c.MTLSClientCAFile != "" && c.TLSCertFile == "" {
+		return c, fmt.Errorf("PRAXIS_MTLS_CLIENT_CA_FILE: requires PRAXIS_TLS_CERT_FILE (mTLS implies TLS)")
 	}
 	return c, nil
 }

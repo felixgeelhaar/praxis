@@ -134,6 +134,62 @@ func TestLoad_AuditRetentionInterval_Override(t *testing.T) {
 	}
 }
 
+func TestLoad_TLS_DefaultsEmpty(t *testing.T) {
+	t.Setenv("PRAXIS_TLS_CERT_FILE", "")
+	t.Setenv("PRAXIS_TLS_KEY_FILE", "")
+	t.Setenv("PRAXIS_MTLS_CLIENT_CA_FILE", "")
+	c, err := config.Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if c.TLSCertFile != "" || c.TLSKeyFile != "" || c.MTLSClientCAFile != "" {
+		t.Errorf("TLS fields=%+v want empty", c)
+	}
+}
+
+func TestLoad_TLS_CertWithoutKeyRejected(t *testing.T) {
+	t.Setenv("PRAXIS_TLS_CERT_FILE", "/etc/praxis/tls.crt")
+	t.Setenv("PRAXIS_TLS_KEY_FILE", "")
+	t.Setenv("PRAXIS_MTLS_CLIENT_CA_FILE", "")
+	if _, err := config.Load(); err == nil {
+		t.Error("cert without key must error")
+	}
+}
+
+func TestLoad_TLS_KeyWithoutCertRejected(t *testing.T) {
+	t.Setenv("PRAXIS_TLS_CERT_FILE", "")
+	t.Setenv("PRAXIS_TLS_KEY_FILE", "/etc/praxis/tls.key")
+	t.Setenv("PRAXIS_MTLS_CLIENT_CA_FILE", "")
+	if _, err := config.Load(); err == nil {
+		t.Error("key without cert must error")
+	}
+}
+
+func TestLoad_MTLS_RequiresTLS(t *testing.T) {
+	t.Setenv("PRAXIS_TLS_CERT_FILE", "")
+	t.Setenv("PRAXIS_TLS_KEY_FILE", "")
+	t.Setenv("PRAXIS_MTLS_CLIENT_CA_FILE", "/etc/praxis/clients.pem")
+	if _, err := config.Load(); err == nil {
+		t.Error("mTLS without TLS must error")
+	}
+}
+
+func TestLoad_TLS_FullConfigAccepted(t *testing.T) {
+	t.Setenv("PRAXIS_TLS_CERT_FILE", "/etc/praxis/tls.crt")
+	t.Setenv("PRAXIS_TLS_KEY_FILE", "/etc/praxis/tls.key")
+	t.Setenv("PRAXIS_MTLS_CLIENT_CA_FILE", "/etc/praxis/clients.pem")
+	c, err := config.Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if c.TLSCertFile != "/etc/praxis/tls.crt" {
+		t.Errorf("CertFile=%s", c.TLSCertFile)
+	}
+	if c.MTLSClientCAFile != "/etc/praxis/clients.pem" {
+		t.Errorf("CAFile=%s", c.MTLSClientCAFile)
+	}
+}
+
 func TestLoad_OTLP_Defaults(t *testing.T) {
 	t.Setenv("PRAXIS_OTLP_ENDPOINT", "")
 	t.Setenv("PRAXIS_OTLP_PROTOCOL", "")
