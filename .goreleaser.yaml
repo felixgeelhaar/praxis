@@ -1,0 +1,107 @@
+version: 2
+
+project_name: praxis
+
+before:
+  hooks:
+    - go mod tidy
+    - go test ./...
+
+builds:
+  - id: praxis
+    main: ./cmd/praxis
+    binary: praxis
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - darwin
+      - linux
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X main.Version={{ .Version }}
+      - -X main.Commit={{ .ShortCommit }}
+      - -X main.BuildDate={{ .Date }}
+  - id: praxis-pluginhost
+    # praxis-pluginhost runs Go plugins, which are only supported on
+    # linux + darwin. Skip windows for this binary.
+    main: ./cmd/praxis-pluginhost
+    binary: praxis-pluginhost
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - darwin
+      - linux
+    goarch:
+      - amd64
+      - arm64
+
+archives:
+  - id: bundles
+    ids:
+      - praxis
+      - praxis-pluginhost
+    formats:
+      - tar.gz
+    format_overrides:
+      - goos: windows
+        formats:
+          - zip
+    name_template: >-
+      {{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}
+    files:
+      - README.md
+      - LICENSE*
+      - CHANGELOG.md
+      - SECURITY.md
+
+brews:
+  - ids:
+      - bundles
+    repository:
+      owner: felixgeelhaar
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    directory: Formula
+    homepage: https://github.com/felixgeelhaar/praxis
+    description: "Praxis — execution layer of the Mnemos/Chronos/Nous/Praxis cognitive stack"
+    license: MIT
+    install: |
+      bin.install "praxis"
+      bin.install "praxis-pluginhost"
+    test: |
+      system bin/"praxis", "version"
+
+dockers:
+  - image_templates:
+      - "ghcr.io/felixgeelhaar/praxis:{{ .Version }}"
+      - "ghcr.io/felixgeelhaar/praxis:latest"
+    ids:
+      - praxis
+    dockerfile: Dockerfile
+    goos: linux
+    goarch: amd64
+
+checksum:
+  name_template: checksums.txt
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+      - '^chore:'
+
+release:
+  github:
+    owner: felixgeelhaar
+    name: praxis
+  draft: false
+  prerelease: auto
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
