@@ -57,6 +57,17 @@ jobs:
             https://raw.githubusercontent.com/sigstore/root-signing/main/targets/fulcio_v1.crt.pem
           test -s /tmp/fulcio_v1.crt.pem
 
+      - name: Inspect cosign output formats
+        run: |
+          echo "== plugin.so.cert (first 400 bytes) =="
+          head -c 400 /tmp/plugin/plugin.so.cert | xxd | head -25
+          echo
+          echo "== plugin.so.sig (first 200 bytes) =="
+          head -c 200 /tmp/plugin/plugin.so.sig | xxd | head -15
+          echo
+          echo "== file types =="
+          file /tmp/plugin/plugin.so.cert /tmp/plugin/plugin.so.sig
+
       - name: Run praxis VerifyKeyless against the signed artefact
         run: |
           go run ./cmd/fulcio-smoke \
