@@ -193,11 +193,17 @@ func parsePEMCertificate(raw []byte) (*x509.Certificate, error) {
 
 func parseBase64Certificate(raw []byte) (*x509.Certificate, error) {
 	trimmed := bytes.TrimSpace(raw)
-	der, err := base64.StdEncoding.DecodeString(string(trimmed))
+	decoded, err := base64.StdEncoding.DecodeString(string(trimmed))
 	if err != nil {
 		return nil, err
 	}
-	return x509.ParseCertificate(der)
+	// cosign 2.x base64-encodes the *PEM block*, not raw DER. Try
+	// parsing the decoded bytes as PEM first, then fall back to
+	// treating them as DER.
+	if cert, perr := parsePEMCertificate(decoded); perr == nil {
+		return cert, nil
+	}
+	return x509.ParseCertificate(decoded)
 }
 
 func chainToFulcio(leaf *x509.Certificate, intermediates, roots []*x509.Certificate, now time.Time) error {

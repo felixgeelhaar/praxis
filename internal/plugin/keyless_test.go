@@ -322,6 +322,33 @@ func TestVerifyKeyless_AcceptsBase64Cert(t *testing.T) {
 	}
 }
 
+func TestVerifyKeyless_AcceptsBase64WrappedPEM(t *testing.T) {
+	// cosign 2.x base64-encodes the entire PEM block (not raw DER)
+	// when emitting --output-certificate. Reject this previously.
+	ca := newTestCA(t)
+	leaf, leafKey := ca.issueLeaf(t,
+		"https://github.com/felixgeelhaar/praxis/.github/workflows/release.yml@refs/tags/v1.0.0",
+		"https://token.actions.githubusercontent.com",
+	)
+	dir := t.TempDir()
+	artifact := writeArtifactWithKeyless(t, dir, []byte("payload"), leaf, leafKey)
+	pemBytes := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: leaf.Raw})
+	if err := os.WriteFile(artifact+plugin.CertificateExtension,
+		[]byte(base64.StdEncoding.EncodeToString(pemBytes)), 0o600); err != nil {
+		t.Fatalf("rewrite cert: %v", err)
+	}
+	v := plugin.KeylessVerifier{
+		FulcioRoots: []*x509.Certificate{ca.rootCert},
+		TrustedIdentities: []plugin.Identity{{
+			SubjectGlob: "https://github.com/felixgeelhaar/*",
+			Issuer:      "https://token.actions.githubusercontent.com",
+		}},
+	}
+	if err := plugin.VerifyKeyless(plugin.Discovered{Artifact: artifact}, v); err != nil {
+		t.Errorf("VerifyKeyless on base64-of-PEM cert: %v", err)
+	}
+}
+
 func TestLoadFulcioRoots_BadPath(t *testing.T) {
 	_, err := plugin.LoadFulcioRoots([]string{"/nonexistent/root.pem"})
 	if err == nil {
