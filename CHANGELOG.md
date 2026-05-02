@@ -8,6 +8,26 @@ Releases are tagged and published via tag-triggered CI; this file is the human-r
 
 No unreleased changes.
 
+## [0.2.1] — 2026-05-02
+
+Operational hardening pass on top of v0.2.0.
+
+### Added
+
+- `PRAXIS_API_TOKEN_FILE`: SIGHUP-rotatable bearer token. Mirrors the TLS-cert pattern so credential rotation no longer requires a restart.
+- `docs/quickstart.md` and `docs/runbook.md`: install / first-action / rotation / incident-response surfaces that previously lived in scattered comments and SECURITY.md.
+- Real-upstream MCP federation integration test (build tag `integration`) — spins a full mcp-go HTTP server, drives `federation.Connect` + `CallTool`, asserts the round-trip.
+- Fulcio E2E smoke workflow (`workflow_dispatch`) — has cosign sign a binary against production Fulcio using the runner's OIDC token, then runs `VerifyKeyless` against the resulting cert + the live Fulcio root.
+- Weekly + manual `bench-baseline.yml` workflow that regenerates `bench/baseline.txt` on `ubuntu-latest`, opening a PR with the snapshot. `make bench-check` now compares against a CI-runner baseline instead of a developer laptop.
+
+### Changed
+
+- Dockerfile pins `alpine:3.21` by digest (`sha256:48b0309c…`); the v0.2.0 image was tagged-only. CONT-001 in `.nox/vex.json` flips from `under_investigation` to `fixed`.
+
+### Fixed
+
+- Postgres + sqlite migration runners now track applied migrations in a `schema_migrations` table; integration suites that re-open the same database across subtests no longer fail on non-idempotent DDL.
+
 ## [0.2.0] — 2026-05-02
 
 Phase 6 closes out: production hardening + supply-chain security.
