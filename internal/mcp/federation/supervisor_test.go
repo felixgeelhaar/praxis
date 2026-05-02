@@ -133,11 +133,20 @@ func TestSupervisor_OnDisconnectFiresOnFailure(t *testing.T) {
 	}
 }
 
-func TestConnect_RejectsURLTransport(t *testing.T) {
+func TestConnect_RejectsBothURLAndCommand(t *testing.T) {
 	_, err := federation.Connect(context.Background(), federation.Upstream{
-		Name: "url-only", URL: "https://example.com",
+		Name: "ambiguous", URL: "https://example.com", Command: []string{"echo"},
 	})
-	if !errors.Is(err, federation.ErrURLTransportUnsupported) {
-		t.Errorf("err=%v want ErrURLTransportUnsupported", err)
+	if err == nil {
+		t.Fatal("expected error for upstream with both url and command")
+	}
+}
+
+func TestConnect_RejectsNeitherURLNorCommand(t *testing.T) {
+	_, err := federation.Connect(context.Background(), federation.Upstream{
+		Name: "empty",
+	})
+	if err == nil {
+		t.Fatal("expected error for upstream with neither url nor command")
 	}
 }

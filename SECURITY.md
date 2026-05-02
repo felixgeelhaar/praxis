@@ -12,7 +12,7 @@ Praxis is the execution layer of the Mnemos / Chronos / Nous / Praxis cognitive 
 - **HTTP API (`praxis serve`)**: every `/v1/*` endpoint requires a Bearer token from `PRAXIS_API_TOKEN`. `/healthz` and `/metrics` are open by default — appropriate for in-cluster scrapers behind a TLS-terminating ingress.
 - **MCP server (`praxis mcp`, stdio)**: trusted; agents talking to Praxis over MCP run alongside the binary.
 - **Plugins (`PRAXIS_PLUGIN_DIR`)**: untrusted by default. Every plugin must be signed (cosign-blob compatible ECDSA P-256) and verified against the operator's `PRAXIS_PLUGIN_TRUSTED_KEYS` bundle before load. Unsigned plugins fail with `ErrSignatureMissing`; plugins signed by an unknown key fail with `ErrSignatureInvalid`.
-- **Federated MCP upstreams (`PRAXIS_MCP_FEDERATION_CONFIG`)**: each upstream's tools register under a `<upstream>__<tool>` namespace and run through the same policy / schema / idempotency / audit pipeline as local handlers. The token in the federation config is forwarded as the Bearer header for HTTP transports.
+- **Federated MCP upstreams (`PRAXIS_MCP_FEDERATION_CONFIG`)**: each upstream's tools register under a `<upstream>__<tool>` namespace and run through the same policy / schema / idempotency / audit pipeline as local handlers. The `token` field is forwarded as the Bearer header for HTTP transports; `ca_bundle` pins the trust store used to verify the upstream certificate, and `insecure_skip_verify` disables verification for local development only.
 
 Production deployments must:
 
@@ -120,7 +120,6 @@ Each rule category is waived in `.nox/vex.json` (OpenVEX v0.2.0) with explicit `
 
 ## Known gaps
 
-- mTLS for the MCP surface is operator-provided (mcp-go ships only stdio today; in-process TLS lands once the upstream adds a TCP transport). HTTP API mTLS is in-process via `PRAXIS_TLS_CERT_FILE` / `PRAXIS_TLS_KEY_FILE` / `PRAXIS_MTLS_CLIENT_CA_FILE` (Phase 6).
+- mTLS for the inbound MCP server is still operator-provided (mcp-go's stdio transport is the only consumer-facing surface); the federation client now talks HTTPS to upstream MCP servers using a pinnable CA bundle (Phase 6 t-fed-http-transport).
 - The in-process sandbox cannot enforce `MaxMemoryBytes`; the field is reserved and enforced only on the cgroup v2 path.
-- Federation upstream URL transport is not implemented yet (mcp-go v1.9 ships only stdio); URL upstreams in the federation config fail with `ErrURLTransportUnsupported`.
 - Plugin signatures rely on operator-managed key bundles. Sigstore Fulcio / Rekor integration for keyless verification is on the roadmap.

@@ -5,7 +5,7 @@ go 1.26.2
 require (
 	github.com/felixgeelhaar/bolt v1.3.0
 	github.com/felixgeelhaar/fortify v1.2.1
-	github.com/felixgeelhaar/mcp-go v1.9.0
+	github.com/felixgeelhaar/mcp-go v1.10.0
 	github.com/felixgeelhaar/statekit v0.8.0
 	github.com/fsnotify/fsnotify v1.7.0
 	github.com/jackc/pgx/v5 v5.9.2

@@ -2,16 +2,22 @@ package federation
 
 import (
 	"context"
+	"crypto/x509"
 	"errors"
 	"fmt"
+	"os"
 
 	"github.com/felixgeelhaar/mcp-go/client"
 )
 
-// ErrURLTransportUnsupported signals an upstream that uses URL
-// (HTTP/SSE) transport. mcp-go v1.9 ships only stdio; HTTP transport
-// is on its roadmap. The federation supervisor logs and skips these
-// rather than failing startup so a partial federation still works.
+// ErrURLTransportUnsupported is retained for backwards-compatible
+// callers that switch on it. As of Phase 6 t-fed-http-transport the
+// federation client supports HTTP upstreams via mcp-go v1.10's
+// HTTPTransport, so this sentinel is no longer returned for URL
+// upstreams.
+//
+// Deprecated: HTTP federation is now supported. Kept only so external
+// callers that imported the symbol do not fail to compile.
 var ErrURLTransportUnsupported = errors.New("federation upstream URL transport not yet supported (stdio only)")
 
 // Tool mirrors mcp-go's Tool but lives in this package so callers
@@ -67,20 +73,22 @@ func (c *Connection) Close() error {
 // list-tools handshake. The Allow allowlist filters the returned tool
 // set; an empty Allow means "every tool the upstream advertises."
 //
-// stdio is the only supported transport in this Phase 5 cut. URL
-// transports return ErrURLTransportUnsupported so the supervisor can
-// log + skip without aborting the rest of the federation.
+// Both stdio (Command) and HTTP (URL) transports are supported. HTTP
+// upstreams forward the upstream's Token as a Bearer header and
+// verify the server certificate against CABundle (or the host trust
+// store when CABundle is empty). InsecureSkipVerify disables that
+// check for local development.
 func Connect(ctx context.Context, upstream Upstream) (*Connection, error) {
-	if upstream.URL != "" {
-		return nil, fmt.Errorf("upstream %q: %w", upstream.Name, ErrURLTransportUnsupported)
+	if upstream.URL != "" && len(upstream.Command) > 0 {
+		return nil, fmt.Errorf("upstream %q: set exactly one of url or command", upstream.Name)
 	}
-	if len(upstream.Command) == 0 {
-		return nil, fmt.Errorf("upstream %q: command required", upstream.Name)
+	if upstream.URL == "" && len(upstream.Command) == 0 {
+		return nil, fmt.Errorf("upstream %q: url or command required", upstream.Name)
 	}
 
-	transport, err := client.NewStdioTransport(upstream.Command[0], upstream.Command[1:]...)
+	transport, err := dialTransport(upstream)
 	if err != nil {
-		return nil, fmt.Errorf("upstream %q: stdio transport: %w", upstream.Name, err)
+		return nil, fmt.Errorf("upstream %q: %w", upstream.Name, err)
 	}
 
 	cli := client.New(transport)
@@ -137,6 +145,50 @@ func TriggerCloseForTest(c *Connection, err error) {
 	case c.closed <- err:
 	default:
 	}
+}
+
+// dialTransport selects between stdio and HTTP transports based on
+// the upstream's URL / Command fields. Validation already enforces
+// exactly one is set.
+func dialTransport(u Upstream) (client.Transport, error) {
+	if u.URL != "" {
+		opts := []client.HTTPTransportOption{}
+		if u.Token != "" {
+			opts = append(opts, client.WithBearerToken(u.Token))
+		}
+		if u.CABundle != "" {
+			pool, err := loadCAPool(u.CABundle)
+			if err != nil {
+				return nil, fmt.Errorf("ca bundle: %w", err)
+			}
+			opts = append(opts, client.WithCABundle(pool))
+		}
+		if u.InsecureSkipVerify {
+			opts = append(opts, client.WithInsecureSkipVerify())
+		}
+		t, err := client.NewHTTPTransport(u.URL, opts...)
+		if err != nil {
+			return nil, fmt.Errorf("http transport: %w", err)
+		}
+		return t, nil
+	}
+	t, err := client.NewStdioTransport(u.Command[0], u.Command[1:]...)
+	if err != nil {
+		return nil, fmt.Errorf("stdio transport: %w", err)
+	}
+	return t, nil
+}
+
+func loadCAPool(path string) (*x509.CertPool, error) {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	pool := x509.NewCertPool()
+	if !pool.AppendCertsFromPEM(raw) {
+		return nil, fmt.Errorf("no PEM certificates parsed from %s", path)
+	}
+	return pool, nil
 }
 
 func stringSet(s []string) map[string]bool {

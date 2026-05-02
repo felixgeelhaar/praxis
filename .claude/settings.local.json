@@ -75,7 +75,10 @@
       "Bash(gh release *)",
       "mcp__roady__roady_get_state",
       "mcp__nox__list_findings",
-      "Bash(python3 -c \"import json; d=json.load\\(open\\('.nox/vex.json'\\)\\); print\\('statements:', len\\(d['statements']\\)\\); print\\('rules:', sorted\\(s['vulnerability']['@id'] for s in d['statements']\\)\\)\")"
+      "Bash(python3 -c \"import json; d=json.load\\(open\\('.nox/vex.json'\\)\\); print\\('statements:', len\\(d['statements']\\)\\); print\\('rules:', sorted\\(s['vulnerability']['@id'] for s in d['statements']\\)\\)\")",
+      "Read(//Users/felixgeelhaar/Developer/projects/open_source/mcp-go/**)",
+      "Bash(sed -i '' -e 's/mu: newFakeMu\\(\\),//g' -e 's/mu:       newFakeMu\\(\\),//g' -e 's/mu:   newFakeMu\\(\\),//g' -e 's/mu:     newFakeMu\\(\\),//g' client/http_test.go)",
+      "Bash(gh pr create --title 'feat\\(client\\): HTTP transport for client-side JSON-RPC' --body ' *)"
     ]
   }
 }

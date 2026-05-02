@@ -42,6 +42,16 @@ type Upstream struct {
 	Command []string `yaml:"command,omitempty"`
 	Token   string   `yaml:"token,omitempty"`
 	Allow   []string `yaml:"allow,omitempty"`
+
+	// CABundle is a filesystem path to a PEM bundle the federation
+	// client trusts when verifying the upstream's TLS certificate.
+	// Empty means "use the host's default trust store." Ignored for
+	// stdio transports.
+	CABundle string `yaml:"ca_bundle,omitempty"`
+	// InsecureSkipVerify disables TLS certificate verification.
+	// Dangerous; only useful for local development against a private
+	// MCP server with self-signed certs.
+	InsecureSkipVerify bool `yaml:"insecure_skip_verify,omitempty"`
 }
 
 // LoadConfig parses the file at path into a Config. Returns
