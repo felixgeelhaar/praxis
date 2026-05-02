@@ -49,10 +49,16 @@ jobs:
           # not covered by the VEX document fails the scan. Update
           # the VEX document (not the baseline) when accepting new
           # findings.
+          # nox 0.7.0 exits non-zero whenever findings remain even when
+          # every category is covered by the supplied VEX document. The
+          # downstream "Fail on unbaselined finding categories" step is
+          # the real policy gate; swallow nox's exit code here so SARIF
+          # / SBOM / annotation steps still run.
           nox scan . \
             -format all \
             -output ./.nox/out \
-            -vex ./.nox/vex.json
+            -vex ./.nox/vex.json || true
+          test -f ./.nox/out/findings.json
 
       - name: Upload SARIF to Code Scanning
         if: always()
