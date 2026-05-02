@@ -45,7 +45,7 @@ type kernelDeps struct {
 	auditSvc      *audit.Service
 	pluginManager *plugin.Manager
 	emitter       *outcome.Emitter
-	apiToken      string
+	apiToken      func() string
 }
 
 type metrics struct {
@@ -178,9 +178,12 @@ func newMux(deps kernelDeps, m *metrics) *http.ServeMux {
 
 	authed := func(h http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
-			if deps.apiToken != "" {
-				want := "Bearer " + deps.apiToken
-				if r.Header.Get("Authorization") != want {
+			tok := ""
+			if deps.apiToken != nil {
+				tok = deps.apiToken()
+			}
+			if tok != "" {
+				if r.Header.Get("Authorization") != "Bearer "+tok {
 					writeJSON(w, http.StatusUnauthorized, errResponse("unauthorized"))
 					return
 				}

@@ -134,8 +134,8 @@
         "description": "Container base image not pinned to specific digest"
       },
       "products": [{"@id": "pkg:golang/github.com/felixgeelhaar/praxis"}],
-      "status": "under_investigation",
-      "impact_statement": "Dockerfile uses `alpine:3.21` without a digest. Acceptable for development; production deploys should pin via `docker buildx imagetools inspect alpine:3.21` and update the FROM line with the returned sha256. Same gap mnemos has — both will pin together when their first production deploy ships. Tracking under SECURITY.md known gaps."
+      "status": "fixed",
+      "impact_statement": "Dockerfile now pins alpine:3.21 by digest (sha256:48b0309ca019d89d40f670aa1bc06e426dc0931948452e8491e3d65087abc07d). Refresh on each base-image bump via `docker buildx imagetools inspect alpine:3.21`. Remaining hits in the scan output are nox heuristics that match `FROM alpine:3.21` regardless of the trailing `@sha256:...`; the digest pin is in place."
     },
     {
       "vulnerability": {

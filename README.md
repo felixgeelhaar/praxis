@@ -178,12 +178,15 @@ Capabilities run in **degraded mode** without credentials: `Execute` returns a s
 
 | Doc | Purpose |
 |---|---|
+| [Quickstart](./docs/quickstart.md) | First action in five minutes |
+| [Runbook](./docs/runbook.md) | Health probes, rotations, common incidents, DR drill |
 | [Vision](./Vision.md) | The *why* — execution as infrastructure |
 | [PRD](./PRD.md) | What we're building, for whom, in which phases |
 | [TDD](./TDD.md) | Domain model, services, contracts, storage |
 | [Roadmap](./Roadmap.md) | Phased delivery |
 | [Architecture](./docs/architecture.md) | Internal services, executor flow, failure modes |
 | [Integrations](./docs/integrations.md) | Nous → Praxis · Praxis → Mnemos · Praxis → handlers |
+| [Security](./SECURITY.md) | Threat model, plugin trust, baseline waivers |
 | [Contributing](./CONTRIBUTING.md) | How to contribute |
 | [Agents](./AGENTS.md) | Guidance for AI coding agents working in this repo |
 

@@ -15,6 +15,7 @@ type Config struct {
 	HTTPHost                   string
 	HTTPPort                   int
 	APIToken                   string
+	APITokenFile               string // PRAXIS_API_TOKEN_FILE; SIGHUP-rotatable file containing the bearer token. Wins over APIToken.
 	DBType                     string
 	DBConn                     string
 	MnemosURL                  string
@@ -59,6 +60,7 @@ func Load() (Config, error) {
 		HTTPHost:                   getEnv("PRAXIS_HTTP_HOST", "0.0.0.0"),
 		HTTPPort:                   getInt("PRAXIS_HTTP_PORT", 8080),
 		APIToken:                   os.Getenv("PRAXIS_API_TOKEN"),
+		APITokenFile:               os.Getenv("PRAXIS_API_TOKEN_FILE"),
 		DBType:                     strings.ToLower(getEnv("PRAXIS_DB_TYPE", "memory")),
 		DBConn:                     os.Getenv("PRAXIS_DB_CONN"),
 		MnemosURL:                  os.Getenv("PRAXIS_MNEMOS_URL"),

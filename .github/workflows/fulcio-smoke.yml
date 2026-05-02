@@ -1,0 +1,102 @@
+name: Fulcio E2E Smoke
+
+# Manually triggered end-to-end check that exercises the full keyless
+# pipeline: cosign signs a binary against Fulcio (production Sigstore
+# infrastructure) using the workflow's GitHub OIDC token, downloads
+# the production Fulcio root, and runs the praxis VerifyKeyless path
+# against the resulting cert + sig pair.
+#
+# Run via Actions tab → "Fulcio E2E Smoke" → "Run workflow."
+#
+# Phase 6 t-fulcio-verifier / t-fulcio-config validation.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write   # required so cosign can mint a Fulcio cert.
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - uses: sigstore/cosign-installer@v3
+        with:
+          cosign-release: v2.4.1
+
+      - name: Produce a fake plugin artefact
+        run: |
+          mkdir -p /tmp/plugin
+          printf 'praxis fulcio smoke %s\n' "${GITHUB_SHA}" > /tmp/plugin/plugin.so
+
+      - name: Sign with cosign sign-blob (keyless)
+        env:
+          COSIGN_EXPERIMENTAL: "1"
+        run: |
+          cosign sign-blob \
+            --yes \
+            --output-signature /tmp/plugin/plugin.so.sig \
+            --output-certificate /tmp/plugin/plugin.so.cert \
+            /tmp/plugin/plugin.so
+
+      - name: Fetch production Fulcio root
+        run: |
+          # Sigstore-published TUF root pinned to the production
+          # Fulcio CA. https://docs.sigstore.dev/system_config/public_deployment/
+          curl -fsSL -o /tmp/fulcio_v1.crt.pem \
+            https://raw.githubusercontent.com/sigstore/root-signing/main/repository/repository/targets/fulcio_v1.crt.pem
+          test -s /tmp/fulcio_v1.crt.pem
+
+      - name: Run praxis VerifyKeyless against the signed artefact
+        run: |
+          # Inline test target that drives the verifier the same way the
+          # plugin pipeline does, but against real Sigstore output.
+          cat > /tmp/smoke.go <<'EOF'
+          package main
+
+          import (
+              "crypto/x509"
+              "encoding/pem"
+              "fmt"
+              "os"
+              "github.com/felixgeelhaar/praxis/internal/plugin"
+          )
+
+          func main() {
+              roots, err := plugin.LoadFulcioRoots([]string{"/tmp/fulcio_v1.crt.pem"})
+              if err != nil {
+                  fmt.Println("load roots:", err)
+                  os.Exit(1)
+              }
+              v := plugin.KeylessVerifier{
+                  FulcioRoots: roots,
+                  // GitHub Actions OIDC issuer; subject is the workflow ref.
+                  TrustedIdentities: []plugin.Identity{{
+                      SubjectGlob: "https://github.com/" + os.Getenv("GITHUB_REPOSITORY") + "/*",
+                      Issuer:      "https://token.actions.githubusercontent.com",
+                  }},
+              }
+              if err := plugin.VerifyKeyless(plugin.Discovered{Artifact: "/tmp/plugin/plugin.so"}, v); err != nil {
+                  fmt.Println("VerifyKeyless:", err)
+                  // Diagnostic: print the cert subject + issuer for debug.
+                  raw, _ := os.ReadFile("/tmp/plugin/plugin.so.cert")
+                  if blk, _ := pem.Decode(raw); blk != nil {
+                      if c, perr := x509.ParseCertificate(blk.Bytes); perr == nil {
+                          fmt.Println("cert SANs (URI):", c.URIs)
+                          fmt.Println("cert Subject:", c.Subject)
+                      }
+                  }
+                  os.Exit(1)
+              }
+              fmt.Println("OK: VerifyKeyless succeeded against real Fulcio cert")
+          }
+          EOF
+          go run /tmp/smoke.go

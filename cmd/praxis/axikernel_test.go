@@ -55,7 +55,7 @@ func newTestServer(t *testing.T, token string) *httptest.Server {
 	mux := newMux(kernelDeps{
 		logger: logger, exec: exec, registry: reg, repos: repos,
 		auditSvc: auditSvc,
-		emitter:  emitter, apiToken: token,
+		emitter:  emitter, apiToken: func() string { return token },
 	}, &metrics{})
 
 	return httptest.NewServer(mux)

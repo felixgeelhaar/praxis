@@ -228,6 +228,27 @@ func runSighupTLSReload(ctx context.Context, logger *bolt.Logger, loader *tlsLoa
 	}
 }
 
+// runSighupTokenReload listens for SIGHUP and re-reads the API
+// bearer token from PRAXIS_API_TOKEN_FILE. Operators rotate the
+// token by writing the new value into the file, then sending SIGHUP
+// — no restart required. Phase 6 token rotation.
+func runSighupTokenReload(ctx context.Context, logger *bolt.Logger, loader *tokenLoader) {
+	ch := make(chan os.Signal, 1)
+	signal.Notify(ch, syscall.SIGHUP)
+	defer signal.Stop(ch)
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ch:
+			logger.Info().Msg("SIGHUP received; reloading API token")
+			if err := loader.Reload(); err != nil {
+				logger.Error().Err(err).Msg("API token reload failed; previous token still active")
+			}
+		}
+	}
+}
+
 // runSighupReload listens for SIGHUP and re-runs the plugin pipeline
 // when it arrives. Returns when ctx is cancelled. Phase 4: pairs with
 // the fsnotify watcher for deployments where file events aren't
@@ -501,11 +522,21 @@ func runServe() int {
 		go sched.Run(ctx)
 	}
 
+	tokenLoader, err := newTokenLoader(rt.cfg.APIToken, rt.cfg.APITokenFile)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "load API token:", err)
+		return 1
+	}
+	if rt.cfg.APITokenFile != "" {
+		go runSighupTokenReload(ctx, rt.logger, tokenLoader)
+	}
+	apiTokenFn := func() string { return tokenLoader.Token() }
+
 	mux := newMux(kernelDeps{
 		logger: rt.logger, exec: rt.exec, registry: rt.reg, repos: rt.repos,
 		auditSvc:      rt.auditSvc,
 		pluginManager: rt.pluginManager,
-		emitter:       rt.emitter, apiToken: rt.cfg.APIToken,
+		emitter:       rt.emitter, apiToken: apiTokenFn,
 	}, rt.metrics)
 
 	addr := fmt.Sprintf("%s:%d", rt.cfg.HTTPHost, rt.cfg.HTTPPort)
