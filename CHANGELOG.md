@@ -8,6 +8,22 @@ Releases are tagged and published via tag-triggered CI; this file is the human-r
 
 No unreleased changes.
 
+## [0.3.0] — 2026-05-03
+
+Default-on security + capability registry persistence.
+
+### Changed
+
+- **`PRAXIS_PLUGIN_STRICT` defaults to `true`.** Plugin signature failures now fail-stop on startup. Operators who want the previous laissez-faire behaviour set `PRAXIS_PLUGIN_STRICT=0` explicitly. Safer-by-default; the trade-off is now visible in env config rather than implicit in the binary.
+
+### Fixed
+
+- **Capability registry persists to repo on Register** (`internal/capability/registry.go`). Cold-start postgres deployments no longer 500 with an empty `Result` on the first `Execute` — the FK from `actions.capability` to `capabilities(name)` is satisfied because every successful `Register` upserts via the configured `CapabilityRepo`. Test coverage for both happy path and persistence-error propagation.
+- **`postgres.capabilityAdapter.Upsert` normalises nil `Permissions`** to an empty slice. pgx serialised nil as NULL, which tripped the `permissions text[] NOT NULL DEFAULT '{}'` constraint and broke every cold-start upsert silently.
+- **`cmd/praxis/main.go::registerHandlers` surfaces errors** instead of `_ = reg.Register(...)`. A failed Upsert turned every Execute into an opaque 500; loud at startup is much easier to debug.
+- **Cosign 2.x base64-wrapped PEM certs** parsed correctly by the keyless verifier.
+- **Fulcio intermediate cert** passed separately so the x509 chain validates against production roots.
+
 ## [0.2.1] — 2026-05-02
 
 Operational hardening pass on top of v0.2.0.
