@@ -30,7 +30,7 @@ type Config struct {
 	PluginFulcioRoots          []string      // PRAXIS_PLUGIN_FULCIO_ROOTS; PEM bundles trusted as Fulcio roots
 	PluginFulcioSubjects       []string      // PRAXIS_PLUGIN_FULCIO_SUBJECTS; SAN globs allowed by trust policy
 	PluginFulcioIssuer         string        // PRAXIS_PLUGIN_FULCIO_ISSUER; OIDC issuer required on the cert
-	PluginStrict               bool          // PRAXIS_PLUGIN_STRICT=1; any plugin load error aborts startup
+	PluginStrict               bool          // PRAXIS_PLUGIN_STRICT; default true. Any plugin load error aborts startup. Set to "0"/"false" to opt out (not recommended; disables fail-stop on signature failure).
 	PluginAutoreload           bool          // PRAXIS_PLUGIN_AUTORELOAD; default true. fsnotify-driven hot reload.
 	OTLPEndpoint               string        // PRAXIS_OTLP_ENDPOINT; empty disables tracing
 	OTLPProtocol               string        // PRAXIS_OTLP_PROTOCOL; grpc (default) or http
@@ -75,7 +75,7 @@ func Load() (Config, error) {
 		PluginFulcioRoots:          parseList(os.Getenv("PRAXIS_PLUGIN_FULCIO_ROOTS")),
 		PluginFulcioSubjects:       parseList(os.Getenv("PRAXIS_PLUGIN_FULCIO_SUBJECTS")),
 		PluginFulcioIssuer:         os.Getenv("PRAXIS_PLUGIN_FULCIO_ISSUER"),
-		PluginStrict:               parseBool(os.Getenv("PRAXIS_PLUGIN_STRICT")),
+		PluginStrict:               parseBoolDefault(os.Getenv("PRAXIS_PLUGIN_STRICT"), true),
 		PluginAutoreload:           parseBoolDefault(os.Getenv("PRAXIS_PLUGIN_AUTORELOAD"), true),
 		AuditRetention:             parseRetention(os.Getenv("PRAXIS_AUDIT_RETENTION")),
 		AuditRetentionInterval:     getDur("PRAXIS_AUDIT_RETENTION_INTERVAL", time.Hour),

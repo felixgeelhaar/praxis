@@ -300,8 +300,8 @@ func TestLoad_PluginStrict_Default(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
-	if c.PluginStrict {
-		t.Error("PluginStrict default must be false")
+	if !c.PluginStrict {
+		t.Error("PluginStrict default must be true (fail-stop on plugin load failure)")
 	}
 }
 
@@ -321,7 +321,9 @@ func TestLoad_PluginStrict_TruthyValues(t *testing.T) {
 }
 
 func TestLoad_PluginStrict_FalsyValues(t *testing.T) {
-	for _, v := range []string{"0", "false", "no", "off", "garbage"} {
+	// "garbage" hits parseBoolDefault's fallback to default (true), so omit it
+	// from the falsy set — only well-formed boolean negatives flip strict off.
+	for _, v := range []string{"0", "false", "no", "off"} {
 		t.Run(v, func(t *testing.T) {
 			t.Setenv("PRAXIS_PLUGIN_STRICT", v)
 			c, err := config.Load()
